@@ -2,7 +2,7 @@
 
 A beautiful, interactive 3D gradient sphere with AI chat interface built with Next.js, React Three Fiber, and physically-based rendering.
 
-
+Screenshot 2025-06-17 at 14.20.36.png
 
 ## ✨ Features
 
