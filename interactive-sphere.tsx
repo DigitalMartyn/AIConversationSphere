@@ -3,7 +3,7 @@
 import { useRef, useMemo } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, ContactShadows, Environment } from "@react-three/drei"
-import { CanvasTexture, ShaderMaterial } from "three"
+import { CanvasTexture } from "three"
 
 export default function Component() {
   return (
@@ -49,7 +49,6 @@ export default function Component() {
 
 function GradientSphere() {
   const meshRef = useRef()
-  const materialRef = useRef()
 
   // Create a simple horizontal gradient texture
   const gradientTexture = useMemo(() => {
@@ -72,91 +71,44 @@ function GradientSphere() {
     return new CanvasTexture(canvas)
   }, [])
 
-  // Custom shader material
-  const shaderMaterial = useMemo(() => {
-    return new ShaderMaterial({
-      uniforms: {
-        time: { value: 0 },
-        gradientTexture: { value: gradientTexture },
-        opacity: { value: 0.85 },
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        varying vec3 vPosition;
-        varying vec3 vNormal;
-        varying vec3 vWorldPosition;
-        
-        void main() {
-          vUv = uv;
-          vPosition = position;
-          vNormal = normalize(normalMatrix * normal);
-          
-          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPosition.xyz;
-          
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float time;
-        uniform sampler2D gradientTexture;
-        uniform float opacity;
-        
-        varying vec2 vUv;
-        varying vec3 vPosition;
-        varying vec3 vNormal;
-        varying vec3 vWorldPosition;
-        
-        void main() {
-          // Sample the gradient texture
-          vec4 gradientColor = texture2D(gradientTexture, vUv);
-          
-          // Create animated ripple effects using world position
-          float dist = length(vWorldPosition.xz);
-          float ripple1 = sin(dist * 8.0 + time * 2.0) * 0.1;
-          float ripple2 = sin(vWorldPosition.y * 6.0 + time * 1.5) * 0.08;
-          float ripple3 = sin(dot(vWorldPosition, vec3(1.0, 1.0, 1.0)) * 4.0 + time * 3.0) * 0.06;
-          
-          // Combine ripples
-          float totalRipple = ripple1 + ripple2 + ripple3;
-          
-          // Create animated brightness variation
-          float brightness = 1.0 + totalRipple;
-          
-          // Apply ripple effect to the gradient colors
-          vec3 finalColor = gradientColor.rgb * brightness;
-          
-          // Add some emissive glow effect
-          vec3 emissive = finalColor * 0.2;
-          finalColor += emissive;
-          
-          // Add fresnel effect for edge lighting
-          float fresnel = pow(1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
-          finalColor += vec3(1.0) * fresnel * 0.3;
-          
-          gl_FragColor = vec4(finalColor, opacity);
-        }
-      `,
-      transparent: true,
-    })
-  }, [gradientTexture])
-
   useFrame((state) => {
     if (meshRef.current) {
       // Position sphere and add subtle floating animation
       meshRef.current.position.y = 0 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
-    }
 
-    // Update shader time uniform
-    if (materialRef.current) {
-      materialRef.current.uniforms.time.value = state.clock.elapsedTime
+      // Add gentle rotation to the texture for subtle animation
+      meshRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.3) * 0.1
     }
   })
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow>
       <sphereGeometry args={[1.125, 128, 128]} />
-      <primitive object={shaderMaterial} ref={materialRef} />
+      <meshPhysicalMaterial
+        map={gradientTexture}
+        color="#ffffff"
+        transparent={true}
+        opacity={0.85}
+        // Subsurface scattering and transmission - adjusted for white edges
+        transmission={0.4}
+        thickness={0.2}
+        ior={1.2}
+        // Surface properties for reflections
+        roughness={0.05}
+        metalness={0.0}
+        clearcoat={1.0}
+        clearcoatRoughness={0.05}
+        // Environment reflections
+        envMapIntensity={1.0}
+        // Boost colors with emissive - enhanced for white edges
+        emissive="#ffffff"
+        emissiveIntensity={0.2}
+        emissiveMap={gradientTexture}
+        // Add sheen for additional white edge effect
+        sheen={1.0}
+        sheenRoughness={0.1}
+        sheenColor="#ffffff"
+      />
     </mesh>
   )
 }
