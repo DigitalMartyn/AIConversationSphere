@@ -3,7 +3,7 @@
 import { useRef, useMemo } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, ContactShadows, Environment } from "@react-three/drei"
-import { CanvasTexture } from "three"
+import { CanvasTexture, ShaderMaterial } from "three"
 
 export default function Component() {
   return (
@@ -49,6 +49,7 @@ export default function Component() {
 
 function GradientSphere() {
   const meshRef = useRef()
+  const materialRef = useRef()
 
   // Create a simple horizontal gradient texture
   const gradientTexture = useMemo(() => {
@@ -63,7 +64,6 @@ function GradientSphere() {
     gradient.addColorStop(0.25, "#9932CC") // Dark orchid
     gradient.addColorStop(0.5, "#1E90FF") // Dodger blue
     gradient.addColorStop(0.75, "#9932CC") // Dark orchid (mirror)
-    gradient.addColorStop(1, "#FF1493") // Dark orchid (mirror)
     gradient.addColorStop(1, "#FF1493") // Deep pink (back to start)
 
     context.fillStyle = gradient
@@ -72,10 +72,76 @@ function GradientSphere() {
     return new CanvasTexture(canvas)
   }, [])
 
+  // Custom shader material for ripple effect
+  const rippleMaterial = useMemo(() => {
+    return new ShaderMaterial({
+      uniforms: {
+        time: { value: 0 },
+        gradientTexture: { value: gradientTexture },
+        rippleSpeed: { value: 2.0 },
+        rippleFrequency: { value: 8.0 },
+        rippleAmplitude: { value: 0.02 },
+      },
+      vertexShader: `
+        uniform float time;
+        uniform float rippleSpeed;
+        uniform float rippleFrequency;
+        uniform float rippleAmplitude;
+        
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vPosition;
+        
+        void main() {
+          vUv = uv;
+          vNormal = normalize(normalMatrix * normal);
+          
+          // Create ripple effect
+          float ripple = sin(position.x * rippleFrequency + time * rippleSpeed) * 
+                        sin(position.y * rippleFrequency + time * rippleSpeed) * 
+                        sin(position.z * rippleFrequency + time * rippleSpeed);
+          
+          vec3 newPosition = position + normal * ripple * rippleAmplitude;
+          vPosition = newPosition;
+          
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D gradientTexture;
+        uniform float time;
+        
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vPosition;
+        
+        void main() {
+          vec4 gradientColor = texture2D(gradientTexture, vUv);
+          
+          // Add subtle ripple highlight
+          float rippleHighlight = sin(vPosition.x * 8.0 + time * 2.0) * 
+                                 sin(vPosition.y * 8.0 + time * 2.0) * 
+                                 sin(vPosition.z * 8.0 + time * 2.0);
+          
+          vec3 finalColor = gradientColor.rgb + rippleHighlight * 0.1;
+          
+          gl_FragColor = vec4(finalColor, gradientColor.a);
+        }
+      `,
+      transparent: true,
+      opacity: 0.85,
+    })
+  }, [gradientTexture])
+
   useFrame((state) => {
     if (meshRef.current) {
-      // Position sphere lower and add subtle floating animation
+      // Position sphere and add subtle floating animation
       meshRef.current.position.y = 0 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
+    }
+
+    if (materialRef.current) {
+      // Update ripple animation time
+      materialRef.current.uniforms.time.value = state.clock.elapsedTime
     }
   })
 
@@ -83,6 +149,7 @@ function GradientSphere() {
     <mesh ref={meshRef} castShadow receiveShadow>
       <sphereGeometry args={[1.125, 128, 128]} />
       <meshPhysicalMaterial
+        ref={materialRef}
         map={gradientTexture}
         color="#ffffff"
         transparent={true}
@@ -106,6 +173,9 @@ function GradientSphere() {
         sheen={1.0}
         sheenRoughness={0.1}
         sheenColor="#ffffff"
+        // Add displacement for ripple effect
+        displacementMap={gradientTexture}
+        displacementScale={0.02}
       />
     </mesh>
   )
