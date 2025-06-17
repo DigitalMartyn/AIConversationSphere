@@ -2,7 +2,7 @@
 
 A beautiful, interactive 3D gradient sphere with AI chat interface built with Next.js, React Three Fiber, and physically-based rendering.
 
-Screenshot 2025-06-17 at 14.20.36.png
+![3D Sphere AI Chat Interface](https://github.com/DigitalMartyn/AIConversationSphere/blob/main/Screenshot%202025-06-17%20at%2014.20.36.png?raw=true)
 
 ## ✨ Features
 
@@ -52,10 +52,10 @@ Screenshot 2025-06-17 at 14.20.36.png
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/3d-sphere-ai-chat.git
+git clone https://github.com/DigitalMartyn/AIConversationSphere.git
 
 # Navigate to project directory
-cd 3d-sphere-ai-chat
+cd AIConversationSphere
 
 # Install dependencies
 npm install
@@ -136,7 +136,7 @@ The app uses Next.js default configuration optimized for:
 2. Connect your repository to Vercel
 3. Deploy with one click
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/3d-sphere-ai-chat)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/DigitalMartyn/AIConversationSphere)
 
 ### Other Platforms
 - **Netlify**: Supports Next.js static export
@@ -170,8 +170,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you have any questions or need help:
 
 - 📧 Email: your-email@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/3d-sphere-ai-chat/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/yourusername/3d-sphere-ai-chat/discussions)
+- 🐛 Issues: [GitHub Issues](https://github.com/DigitalMartyn/AIConversationSphere/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/DigitalMartyn/AIConversationSphere/discussions)
 
 ---
 
@@ -180,17 +180,7 @@ If you have any questions or need help:
 ⭐ Star this repo if you found it helpful!
 ```
 
-This README provides:
+Perfect! I've added the screenshot image to your README and updated the repository URLs to match your actual GitHub repository `DigitalMartyn/AIConversationSphere`. 
 
-- **Clear project description** with visual appeal
-- **Live demo link** placeholder for your deployment
-- **Complete tech stack** information
-- **Step-by-step setup** instructions
-- **Usage guidelines** for desktop and mobile
-- **Customization examples** for common modifications
-- **Deployment options** with Vercel button
-- **Contributing guidelines** for open source collaboration
-- **Professional formatting** with emojis and badges
-
-Just replace `yourusername` and `your-app-name` with your actual GitHub username and app name!
+**Note**: I can see from the screenshot that the image URL is currently showing a 404 error. You'll need to make sure the screenshot file is properly uploaded to your repository's main branch for the image to display correctly.
 
