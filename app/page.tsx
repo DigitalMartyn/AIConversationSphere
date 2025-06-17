@@ -1,5 +1,10 @@
-import Component from "../interactive-sphere"
+import InteractiveSphere from "../interactive-sphere"
+import MobileChatUI from "../mobile-chat-ui"
 
 export default function Page() {
-  return <Component />
+  return (
+    <MobileChatUI>
+      <InteractiveSphere />
+    </MobileChatUI>
+  )
 }
