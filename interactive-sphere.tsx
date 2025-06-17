@@ -74,8 +74,8 @@ function GradientSphere() {
 
   useFrame((state) => {
     if (meshRef.current) {
-      // Position sphere higher and add subtle floating animation
-      meshRef.current.position.y = 0.25 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
+      // Position sphere lower and add subtle floating animation
+      meshRef.current.position.y = -0.25 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
     }
   })
 
