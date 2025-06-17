@@ -111,10 +111,10 @@ function GradientSphere() {
           const distance = Math.sqrt(centerX * centerX + centerY * centerY) / 128
           const angle = Math.atan2(centerY, centerX)
 
-          // Create multiple wave patterns
-          const wave1 = Math.sin(distance * 8 + time * 2) * 0.3
-          const wave2 = Math.sin(angle * 4 + time * 1.5) * 0.2
-          const wave3 = Math.sin(x * 0.05 + time * 3) * Math.sin(y * 0.05 + time * 2.5) * 0.2
+          // Create multiple wave patterns with increased amplitude
+          const wave1 = Math.sin(distance * 8 + time * 2) * 0.6 // Increased from 0.3
+          const wave2 = Math.sin(angle * 4 + time * 1.5) * 0.4 // Increased from 0.2
+          const wave3 = Math.sin(x * 0.05 + time * 3) * Math.sin(y * 0.05 + time * 2.5) * 0.4 // Increased from 0.2
 
           // Combine waves and convert to displacement value (0-255)
           const displacement = (wave1 + wave2 + wave3) * 0.5 + 0.5
@@ -143,7 +143,7 @@ function GradientSphere() {
         opacity={0.85}
         // Displacement map for ripples
         displacementMap={displacementTexture}
-        displacementScale={0.02} // Very subtle displacement
+        displacementScale={0.08} // Increased from 0.02 to make ripples more visible
         // Subsurface scattering and transmission - adjusted for white edges
         transmission={0.4}
         thickness={0.2}
