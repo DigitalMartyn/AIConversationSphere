@@ -80,7 +80,7 @@ function GradientSphere() {
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow>
-      <sphereGeometry args={[1.5, 128, 128]} />
+      <sphereGeometry args={[1.125, 128, 128]} />
       <meshPhysicalMaterial
         map={gradientTexture}
         color="#ffffff"
