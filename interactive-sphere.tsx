@@ -63,6 +63,7 @@ function GradientSphere() {
     gradient.addColorStop(0.25, "#9932CC") // Dark orchid
     gradient.addColorStop(0.5, "#1E90FF") // Dodger blue
     gradient.addColorStop(0.75, "#9932CC") // Dark orchid (mirror)
+    gradient.addColorStop(1, "#FF1493") // Dark orchid (mirror)
     gradient.addColorStop(1, "#FF1493") // Deep pink (back to start)
 
     context.fillStyle = gradient
@@ -74,7 +75,7 @@ function GradientSphere() {
   useFrame((state) => {
     if (meshRef.current) {
       // Position sphere higher and add subtle floating animation
-      meshRef.current.position.y = -0.5 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
+      meshRef.current.position.y = 1.0 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
     }
   })
 
