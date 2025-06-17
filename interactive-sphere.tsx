@@ -68,16 +68,31 @@ function GradientSphere() {
     context.fillStyle = gradient
     context.fillRect(0, 0, 512, 512)
 
-    return new CanvasTexture(canvas)
+    // Enable texture wrapping for seamless animation
+    const texture = new CanvasTexture(canvas)
+    texture.wrapS = texture.wrapT = 1000 // RepeatWrapping
+    return texture
   }, [])
 
   useFrame((state) => {
     if (meshRef.current) {
       // Position sphere and add subtle floating animation
       meshRef.current.position.y = 0 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
+    }
 
-      // Add gentle rotation to the texture for subtle animation
-      meshRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.3) * 0.1
+    // Animate the texture UV coordinates for flowing gradient effect
+    if (gradientTexture) {
+      // Horizontal flow - makes gradient slide across the surface
+      gradientTexture.offset.x = (state.clock.elapsedTime * 0.1) % 1
+
+      // Add subtle vertical flow for more complex movement
+      gradientTexture.offset.y = Math.sin(state.clock.elapsedTime * 0.3) * 0.1
+
+      // Slight rotation for additional movement
+      gradientTexture.rotation = Math.sin(state.clock.elapsedTime * 0.2) * 0.1
+
+      // Update the texture
+      gradientTexture.needsUpdate = true
     }
   })
 
