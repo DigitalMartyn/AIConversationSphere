@@ -49,6 +49,7 @@ export default function Component() {
 
 function GradientSphere() {
   const meshRef = useRef()
+  const geometryRef = useRef()
 
   // Create a simple horizontal gradient texture
   const gradientTexture = useMemo(() => {
@@ -71,59 +72,49 @@ function GradientSphere() {
     return new CanvasTexture(canvas)
   }, [])
 
-  // Create animated ripple displacement texture
-  const rippleTexture = useMemo(() => {
-    const canvas = document.createElement("canvas")
-    canvas.width = 256
-    canvas.height = 256
-    const context = canvas.getContext("2d")
-
-    return new CanvasTexture(canvas)
-  }, [])
-
   useFrame((state) => {
     if (meshRef.current) {
       // Position sphere and add subtle floating animation
       meshRef.current.position.y = 0 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
+    }
 
-      // Create animated ripple effect by updating the displacement texture
-      const canvas = rippleTexture.image
-      const context = canvas.getContext("2d")
+    // Create ripple effect by modifying vertex positions
+    if (geometryRef.current) {
+      const positions = geometryRef.current.attributes.position
       const time = state.clock.elapsedTime
 
-      // Clear canvas
-      context.clearRect(0, 0, 256, 256)
+      for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i)
+        const y = positions.getY(i)
+        const z = positions.getZ(i)
 
-      // Create ripple pattern
-      const imageData = context.createImageData(256, 256)
-      const data = imageData.data
+        // Calculate original radius
+        const originalRadius = Math.sqrt(x * x + y * y + z * z)
 
-      for (let x = 0; x < 256; x++) {
-        for (let y = 0; y < 256; y++) {
-          const index = (y * 256 + x) * 4
+        // Create ripple waves
+        const ripple1 = Math.sin(x * 4 + time * 3) * 0.02
+        const ripple2 = Math.sin(y * 4 + time * 2.5) * 0.015
+        const ripple3 = Math.sin(z * 4 + time * 2) * 0.01
 
-          // Create ripple waves
-          const ripple1 = Math.sin(x * 0.1 + time * 2) * Math.sin(y * 0.1 + time * 2)
-          const ripple2 = Math.sin(x * 0.05 + time * 1.5) * Math.sin(y * 0.05 + time * 1.5)
-          const combined = (ripple1 + ripple2 * 0.5) * 0.3
+        const totalRipple = ripple1 + ripple2 + ripple3
+        const newRadius = originalRadius + totalRipple
 
-          const value = Math.floor((combined + 1) * 127.5)
+        // Normalize and apply new radius
+        const normalizedX = x / originalRadius
+        const normalizedY = y / originalRadius
+        const normalizedZ = z / originalRadius
 
-          data[index] = value // R
-          data[index + 1] = value // G
-          data[index + 2] = value // B
-          data[index + 3] = 255 // A
-        }
+        positions.setXYZ(i, normalizedX * newRadius, normalizedY * newRadius, normalizedZ * newRadius)
       }
 
-      context.putImageData(imageData, 0, 0)
-      rippleTexture.needsUpdate = true
+      positions.needsUpdate = true
+      geometryRef.current.computeVertexNormals()
     }
   })
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow>
-      <sphereGeometry args={[1.125, 128, 128]} />
+      <sphereGeometry ref={geometryRef} args={[1.125, 64, 64]} />
       <meshPhysicalMaterial
         map={gradientTexture}
         color="#ffffff"
@@ -148,9 +139,6 @@ function GradientSphere() {
         sheen={1.0}
         sheenRoughness={0.1}
         sheenColor="#ffffff"
-        // Add animated ripple displacement
-        displacementMap={rippleTexture}
-        displacementScale={0.015}
       />
     </mesh>
   )
