@@ -3,7 +3,7 @@
 import { useRef, useMemo } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, ContactShadows, Environment } from "@react-three/drei"
-import { CanvasTexture, ShaderMaterial } from "three"
+import { CanvasTexture } from "three"
 
 export default function Component() {
   return (
@@ -49,7 +49,6 @@ export default function Component() {
 
 function GradientSphere() {
   const meshRef = useRef()
-  const materialRef = useRef()
 
   // Create a simple horizontal gradient texture
   const gradientTexture = useMemo(() => {
@@ -72,76 +71,53 @@ function GradientSphere() {
     return new CanvasTexture(canvas)
   }, [])
 
-  // Custom shader material for ripple effect
-  const rippleMaterial = useMemo(() => {
-    return new ShaderMaterial({
-      uniforms: {
-        time: { value: 0 },
-        gradientTexture: { value: gradientTexture },
-        rippleSpeed: { value: 2.0 },
-        rippleFrequency: { value: 8.0 },
-        rippleAmplitude: { value: 0.02 },
-      },
-      vertexShader: `
-        uniform float time;
-        uniform float rippleSpeed;
-        uniform float rippleFrequency;
-        uniform float rippleAmplitude;
-        
-        varying vec2 vUv;
-        varying vec3 vNormal;
-        varying vec3 vPosition;
-        
-        void main() {
-          vUv = uv;
-          vNormal = normalize(normalMatrix * normal);
-          
-          // Create ripple effect
-          float ripple = sin(position.x * rippleFrequency + time * rippleSpeed) * 
-                        sin(position.y * rippleFrequency + time * rippleSpeed) * 
-                        sin(position.z * rippleFrequency + time * rippleSpeed);
-          
-          vec3 newPosition = position + normal * ripple * rippleAmplitude;
-          vPosition = newPosition;
-          
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D gradientTexture;
-        uniform float time;
-        
-        varying vec2 vUv;
-        varying vec3 vNormal;
-        varying vec3 vPosition;
-        
-        void main() {
-          vec4 gradientColor = texture2D(gradientTexture, vUv);
-          
-          // Add subtle ripple highlight
-          float rippleHighlight = sin(vPosition.x * 8.0 + time * 2.0) * 
-                                 sin(vPosition.y * 8.0 + time * 2.0) * 
-                                 sin(vPosition.z * 8.0 + time * 2.0);
-          
-          vec3 finalColor = gradientColor.rgb + rippleHighlight * 0.1;
-          
-          gl_FragColor = vec4(finalColor, gradientColor.a);
-        }
-      `,
-      transparent: true,
-      opacity: 0.85,
-    })
-  }, [gradientTexture])
+  // Create animated ripple displacement texture
+  const rippleTexture = useMemo(() => {
+    const canvas = document.createElement("canvas")
+    canvas.width = 256
+    canvas.height = 256
+    const context = canvas.getContext("2d")
+
+    return new CanvasTexture(canvas)
+  }, [])
 
   useFrame((state) => {
     if (meshRef.current) {
       // Position sphere and add subtle floating animation
       meshRef.current.position.y = 0 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
-    }
 
-    if (materialRef.current) {
-      // Update ripple animation time
-      materialRef.current.uniforms.time.value = state.clock.elapsedTime
+      // Create animated ripple effect by updating the displacement texture
+      const canvas = rippleTexture.image
+      const context = canvas.getContext("2d")
+      const time = state.clock.elapsedTime
+
+      // Clear canvas
+      context.clearRect(0, 0, 256, 256)
+
+      // Create ripple pattern
+      const imageData = context.createImageData(256, 256)
+      const data = imageData.data
+
+      for (let x = 0; x < 256; x++) {
+        for (let y = 0; y < 256; y++) {
+          const index = (y * 256 + x) * 4
+
+          // Create ripple waves
+          const ripple1 = Math.sin(x * 0.1 + time * 2) * Math.sin(y * 0.1 + time * 2)
+          const ripple2 = Math.sin(x * 0.05 + time * 1.5) * Math.sin(y * 0.05 + time * 1.5)
+          const combined = (ripple1 + ripple2 * 0.5) * 0.3
+
+          const value = Math.floor((combined + 1) * 127.5)
+
+          data[index] = value // R
+          data[index + 1] = value // G
+          data[index + 2] = value // B
+          data[index + 3] = 255 // A
+        }
+      }
+
+      context.putImageData(imageData, 0, 0)
+      rippleTexture.needsUpdate = true
     }
   })
 
@@ -149,7 +125,6 @@ function GradientSphere() {
     <mesh ref={meshRef} castShadow receiveShadow>
       <sphereGeometry args={[1.125, 128, 128]} />
       <meshPhysicalMaterial
-        ref={materialRef}
         map={gradientTexture}
         color="#ffffff"
         transparent={true}
@@ -173,9 +148,9 @@ function GradientSphere() {
         sheen={1.0}
         sheenRoughness={0.1}
         sheenColor="#ffffff"
-        // Add displacement for ripple effect
-        displacementMap={gradientTexture}
-        displacementScale={0.02}
+        // Add animated ripple displacement
+        displacementMap={rippleTexture}
+        displacementScale={0.015}
       />
     </mesh>
   )
