@@ -49,7 +49,6 @@ export default function Component() {
 
 function GradientSphere() {
   const meshRef = useRef()
-  const geometryRef = useRef()
 
   // Create a simple horizontal gradient texture
   const gradientTexture = useMemo(() => {
@@ -77,44 +76,11 @@ function GradientSphere() {
       // Position sphere and add subtle floating animation
       meshRef.current.position.y = 0 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
     }
-
-    // Create ripple effect by modifying vertex positions
-    if (geometryRef.current) {
-      const positions = geometryRef.current.attributes.position
-      const time = state.clock.elapsedTime
-
-      for (let i = 0; i < positions.count; i++) {
-        const x = positions.getX(i)
-        const y = positions.getY(i)
-        const z = positions.getZ(i)
-
-        // Calculate original radius
-        const originalRadius = Math.sqrt(x * x + y * y + z * z)
-
-        // Create ripple waves
-        const ripple1 = Math.sin(x * 4 + time * 3) * 0.02
-        const ripple2 = Math.sin(y * 4 + time * 2.5) * 0.015
-        const ripple3 = Math.sin(z * 4 + time * 2) * 0.01
-
-        const totalRipple = ripple1 + ripple2 + ripple3
-        const newRadius = originalRadius + totalRipple
-
-        // Normalize and apply new radius
-        const normalizedX = x / originalRadius
-        const normalizedY = y / originalRadius
-        const normalizedZ = z / originalRadius
-
-        positions.setXYZ(i, normalizedX * newRadius, normalizedY * newRadius, normalizedZ * newRadius)
-      }
-
-      positions.needsUpdate = true
-      geometryRef.current.computeVertexNormals()
-    }
   })
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow>
-      <sphereGeometry ref={geometryRef} args={[1.125, 64, 64]} />
+      <sphereGeometry args={[1.125, 128, 128]} />
       <meshPhysicalMaterial
         map={gradientTexture}
         color="#ffffff"
