@@ -11,7 +11,7 @@ interface MobileChatUIProps {
 }
 
 export default function MobileChatUI({ children }: MobileChatUIProps) {
-  const [isListening, setIsListening] = useState(true)
+  const [isListening, setIsListening] = useState(false)
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
