@@ -21,7 +21,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       {/* Mobile UI Overlay - No Phone Frame */}
       <div className="absolute inset-0 flex flex-col" style={{ fontFamily: '"Segoe UI", system-ui, sans-serif' }}>
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col items-center justify-center px-8 py-8 z-10 -mt-16">
+        <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 z-10">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg">
               {isListening ? "I'm listening" : "How can I help?"}
