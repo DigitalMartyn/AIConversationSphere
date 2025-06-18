@@ -64,59 +64,10 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
         try {
           recognitionRef.current = new SpeechRecognition()
 
-          // Configure speech recognition with better language support
+          // Configure speech recognition - let browser use default language
           recognitionRef.current.continuous = false
           recognitionRef.current.interimResults = true
-
-          // Try to detect user's language, with fallbacks
-          const getUserLanguage = () => {
-            // Get browser language
-            const browserLang = navigator.language || navigator.languages?.[0] || "en-US"
-
-            // Common supported languages - fallback to these if browser language isn't supported
-            const supportedLanguages = [
-              "en-US",
-              "en-GB",
-              "en-AU",
-              "en-CA",
-              "es-ES",
-              "es-MX",
-              "fr-FR",
-              "de-DE",
-              "it-IT",
-              "pt-BR",
-              "ru-RU",
-              "ja-JP",
-              "ko-KR",
-              "zh-CN",
-              "zh-TW",
-              "ar-SA",
-            ]
-
-            // Check if browser language is in supported list
-            if (supportedLanguages.includes(browserLang)) {
-              return browserLang
-            }
-
-            // Try language without region (e.g., 'en' from 'en-US')
-            const langCode = browserLang.split("-")[0]
-            const fallbackLang = supportedLanguages.find((lang) => lang.startsWith(langCode))
-
-            if (fallbackLang) {
-              return fallbackLang
-            }
-
-            // Ultimate fallback
-            return "en-US"
-          }
-
-          try {
-            recognitionRef.current.lang = getUserLanguage()
-            console.log("Using language:", recognitionRef.current.lang)
-          } catch (error) {
-            console.warn("Error setting language, using en-US:", error)
-            recognitionRef.current.lang = "en-US"
-          }
+          // Remove all language setting - let browser decide
 
           recognitionRef.current.onstart = () => {
             console.log("Speech recognition started")
@@ -169,39 +120,28 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
             // Handle specific errors with user-friendly messages
             switch (event.error) {
               case "not-allowed":
-                alert("Microphone access denied. Please allow microphone access and try again.")
+                console.log("Microphone access denied")
+                setSpeechRecognitionSupported(false)
                 break
               case "no-speech":
                 console.log("No speech detected - this is normal")
                 break
               case "language-not-supported":
-                console.warn("Language not supported, trying en-US fallback")
-                // Try with en-US as fallback
-                try {
-                  recognitionRef.current.lang = "en-US"
-                  setTimeout(() => {
-                    if (!isListening && recognitionRef.current) {
-                      recognitionRef.current.start()
-                    }
-                  }, 100)
-                } catch (fallbackError) {
-                  console.error("Fallback also failed:", fallbackError)
-                  alert("Speech recognition is not working properly. Please use text input instead.")
-                  setSpeechRecognitionSupported(false)
-                }
+                console.warn("Language not supported - disabling speech recognition")
+                setSpeechRecognitionSupported(false)
                 break
               case "network":
-                alert("Network error. Please check your connection and try again.")
+                console.log("Network error during speech recognition")
                 break
               case "audio-capture":
-                alert("Microphone error. Please check your microphone and try again.")
+                console.log("Microphone error")
+                setSpeechRecognitionSupported(false)
                 break
               case "aborted":
                 console.log("Speech recognition was aborted")
                 break
               default:
                 console.log("Speech recognition error:", event.error)
-                // Don't show alert for unknown errors, just log them
                 break
             }
           }
