@@ -3,7 +3,7 @@
 import { useRef, useMemo } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, ContactShadows, Environment } from "@react-three/drei"
-import { CanvasTexture } from "three"
+import { CanvasTexture, BufferGeometry, Float32BufferAttribute, PointsMaterial, AdditiveBlending } from "three"
 
 export default function Component() {
   return (
@@ -30,6 +30,7 @@ export default function Component() {
         </Environment>
 
         <GradientSphere />
+        <FloatingParticles />
 
         <ContactShadows position={[0, -2.5, 0]} opacity={0.4} scale={8} blur={2.5} far={2.5} />
 
@@ -45,6 +46,106 @@ export default function Component() {
       </Canvas>
     </div>
   )
+}
+
+function FloatingParticles() {
+  const particlesRef = useRef()
+  const particleCount = 150
+
+  // Create particle positions and properties
+  const { positions, colors, sizes } = useMemo(() => {
+    const positions = new Float32Array(particleCount * 3)
+    const colors = new Float32Array(particleCount * 3)
+    const sizes = new Float32Array(particleCount)
+
+    const gradientColors = [
+      [1.0, 0.08, 0.58], // Deep pink
+      [0.6, 0.2, 0.8], // Dark orchid
+      [0.12, 0.56, 1.0], // Dodger blue
+      [1.0, 1.0, 1.0], // White
+    ]
+
+    for (let i = 0; i < particleCount; i++) {
+      // Create particles in a sphere around the main sphere
+      const radius = 2 + Math.random() * 3 // Distance from center
+      const theta = Math.random() * Math.PI * 2 // Horizontal angle
+      const phi = Math.random() * Math.PI // Vertical angle
+
+      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
+      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
+      positions[i * 3 + 2] = radius * Math.cos(phi)
+
+      // Assign random gradient colors
+      const colorIndex = Math.floor(Math.random() * gradientColors.length)
+      const color = gradientColors[colorIndex]
+      colors[i * 3] = color[0]
+      colors[i * 3 + 1] = color[1]
+      colors[i * 3 + 2] = color[2]
+
+      // Random sizes
+      sizes[i] = Math.random() * 8 + 2
+    }
+
+    return { positions, colors, sizes }
+  }, [])
+
+  // Create geometry and material
+  const particleGeometry = useMemo(() => {
+    const geometry = new BufferGeometry()
+    geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))
+    geometry.setAttribute("color", new Float32BufferAttribute(colors, 3))
+    geometry.setAttribute("size", new Float32BufferAttribute(sizes, 1))
+    return geometry
+  }, [positions, colors, sizes])
+
+  const particleMaterial = useMemo(() => {
+    return new PointsMaterial({
+      size: 0.05,
+      vertexColors: true,
+      blending: AdditiveBlending,
+      transparent: true,
+      opacity: 0.8,
+      sizeAttenuation: true,
+    })
+  }, [])
+
+  useFrame((state) => {
+    if (particlesRef.current) {
+      const positions = particlesRef.current.geometry.attributes.position.array
+      const time = state.clock.elapsedTime
+
+      // Animate each particle
+      for (let i = 0; i < particleCount; i++) {
+        const i3 = i * 3
+
+        // Get original position
+        const x = positions[i3]
+        const y = positions[i3 + 1]
+        const z = positions[i3 + 2]
+
+        // Add floating motion
+        positions[i3] = x + Math.sin(time * 0.5 + i * 0.1) * 0.02
+        positions[i3 + 1] = y + Math.cos(time * 0.3 + i * 0.15) * 0.03
+        positions[i3 + 2] = z + Math.sin(time * 0.4 + i * 0.2) * 0.025
+
+        // Add orbital motion around the sphere
+        const orbitSpeed = 0.1
+        const orbitRadius = Math.sqrt(x * x + z * z)
+        const currentAngle = Math.atan2(z, x)
+        const newAngle = currentAngle + orbitSpeed * 0.01
+
+        positions[i3] = orbitRadius * Math.cos(newAngle) + Math.sin(time * 0.5 + i * 0.1) * 0.02
+        positions[i3 + 2] = orbitRadius * Math.sin(newAngle) + Math.sin(time * 0.4 + i * 0.2) * 0.025
+      }
+
+      particlesRef.current.geometry.attributes.position.needsUpdate = true
+
+      // Rotate the entire particle system slowly
+      particlesRef.current.rotation.y = time * 0.05
+    }
+  })
+
+  return <points ref={particlesRef} geometry={particleGeometry} material={particleMaterial} />
 }
 
 function GradientSphere() {
