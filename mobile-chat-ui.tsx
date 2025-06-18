@@ -15,6 +15,8 @@ declare global {
   interface Window {
     SpeechRecognition: any
     webkitSpeechRecognition: any
+    AudioContext: any
+    webkitAudioContext: any
   }
 }
 
@@ -39,6 +41,54 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     const debugMessage = `[${timestamp}] ${message}`
     console.log(debugMessage)
     setDebugInfo((prev) => [...prev.slice(-9), debugMessage]) // Keep last 10 messages
+  }
+
+  // Check microphone permissions and audio levels
+  const checkMicrophoneAccess = async () => {
+    try {
+      addDebugMessage("🎤 Checking microphone permissions...")
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      addDebugMessage("✅ Microphone permission granted")
+
+      // Create audio context to check audio levels
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const source = audioContext.createMediaStreamSource(stream)
+      const analyser = audioContext.createAnalyser()
+      source.connect(analyser)
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+
+      // Check audio levels for 2 seconds
+      let maxLevel = 0
+      const checkAudio = () => {
+        analyser.getByteFrequencyData(dataArray)
+        const currentLevel = Math.max(...dataArray)
+        maxLevel = Math.max(maxLevel, currentLevel)
+      }
+
+      const audioCheckInterval = setInterval(checkAudio, 100)
+
+      setTimeout(() => {
+        clearInterval(audioCheckInterval)
+        addDebugMessage(`🔊 Max audio level detected: ${maxLevel}/255`)
+
+        // Clean up
+        stream.getTracks().forEach((track) => track.stop())
+        audioContext.close()
+
+        if (maxLevel < 10) {
+          addDebugMessage("⚠️ Very low audio levels - microphone might not be working")
+        } else {
+          addDebugMessage("✅ Audio input is working")
+        }
+      }, 2000)
+
+      return true
+    } catch (error) {
+      addDebugMessage(`❌ Microphone access failed: ${error.message}`)
+      return false
+    }
   }
 
   // Initialize audio element and speech recognition
@@ -223,34 +273,27 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       return
     }
 
+    // First check microphone access
+    const micAccess = await checkMicrophoneAccess()
+    if (!micAccess) {
+      addDebugMessage("Cannot proceed without microphone access")
+      alert("Microphone access is required for speech recognition. Please allow microphone permissions and try again.")
+      return
+    }
+
     if (recognitionRef.current && !isListening && !isSpeaking && !isProcessing) {
-      // Comprehensive list of language options to test
+      // Test the working language first (en-GB based on your logs)
       const testLanguages = [
-        // Start with browser languages
-        ...navigator.languages,
-        // Common English variants
+        "en-GB", // This seemed to work
         "en-US",
-        "en-GB",
         "en-AU",
         "en-CA",
-        "en-IN",
-        "en-NZ",
-        "en-ZA",
         "en",
-        // Try without any language (browser default)
-        null,
-        // Try empty string
-        "",
-        // Try undefined explicitly
-        undefined,
+        null, // browser default
       ]
 
-      // Remove duplicates and null/undefined values for logging
-      const uniqueLanguages = [
-        ...new Set(testLanguages.filter((lang) => lang !== null && lang !== undefined && lang !== "")),
-      ]
       addDebugMessage(
-        `Will test ${testLanguages.length} language options: ${uniqueLanguages.join(", ")}, plus null/undefined/empty`,
+        `Will test ${testLanguages.length} language options: ${testLanguages.filter((l) => l).join(", ")}, plus browser default`,
       )
 
       for (let i = 0; i < testLanguages.length; i++) {
@@ -263,12 +306,12 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
           const newRecognition = new SpeechRecognition()
 
-          // Configure the new instance
-          newRecognition.continuous = false
+          // Configure the new instance with more permissive settings
+          newRecognition.continuous = true // Keep listening
           newRecognition.interimResults = true
 
           // Set language if specified
-          if (lang !== null && lang !== undefined && lang !== "") {
+          if (lang !== null && lang !== undefined) {
             newRecognition.lang = lang
             addDebugMessage(`Set language property to: "${lang}"`)
           } else {
