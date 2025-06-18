@@ -24,49 +24,28 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [userTranscript, setUserTranscript] = useState("")
   const [lastUserInput, setLastUserInput] = useState("")
   const [speechSupported, setSpeechSupported] = useState(false)
+  const [responseCount, setResponseCount] = useState(0)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const recognitionRef = useRef<any>(null)
 
   const aiResponses = [
-    "That's interesting! Tell me more about that.",
-    "I understand what you're saying. How can I help you with that?",
-    "Thanks for sharing that with me. What would you like to know?",
-    "I hear you! That sounds important to you.",
-    "That's a great point. Let me think about how I can assist you.",
-    "I appreciate you telling me that. What's your main question?",
-    "Interesting perspective! How can I support you with this?",
-    "I'm listening and I want to help. What do you need from me?",
+    "Hello! I'm your AI assistant. How can I help you today?",
+    "I'm here to answer your questions and assist with various tasks.",
+    "Feel free to ask me anything - I'm ready to help!",
+    "I can help you with information, creative tasks, and problem-solving.",
+    "What would you like to know or explore together?",
+    "I'm powered by advanced AI technology and I'm here to make your day better.",
+    "Whether you need help with work, creativity, or just want to chat, I'm here for you.",
+    "I can assist with writing, analysis, problem-solving, and much more. What interests you?",
+    "That's a great question! I love helping people learn new things.",
+    "I'm always excited to have a conversation. What's on your mind?",
+    "Thanks for chatting with me! I'm here whenever you need assistance.",
+    "I enjoy our conversations! Is there anything specific you'd like to discuss?",
+    "I'm designed to be helpful, harmless, and honest. How can I support you today?",
+    "Every conversation is unique and interesting to me. What would you like to talk about?",
+    "I'm here to make your day a little easier. What can I help you with?",
   ]
-
-  // Generate contextual response based on user input
-  const generateContextualResponse = (userInput: string) => {
-    if (!userInput || userInput.trim() === "") {
-      return "I'm here and ready to help! What would you like to talk about?"
-    }
-
-    const input = userInput.toLowerCase()
-
-    if (input.includes("hello") || input.includes("hi") || input.includes("hey")) {
-      return "Hello! It's great to hear from you. How can I help you today?"
-    } else if (input.includes("help") || input.includes("assist")) {
-      return "I'm here to help! What do you need assistance with?"
-    } else if (input.includes("how are you") || input.includes("how's it going")) {
-      return "I'm doing well, thank you for asking! How are you doing today?"
-    } else if (input.includes("thank")) {
-      return "You're very welcome! Is there anything else I can help you with?"
-    } else if (input.includes("question") || input.includes("ask")) {
-      return "I'd be happy to answer your question. What would you like to know?"
-    } else if (input.includes("problem") || input.includes("issue")) {
-      return "I understand you're facing a challenge. Let me see how I can help you solve this."
-    } else if (input.includes("work") || input.includes("job")) {
-      return "I can definitely help with work-related topics. What specifically are you working on?"
-    } else if (input.includes("learn") || input.includes("teach")) {
-      return "I love helping people learn! What subject or skill are you interested in?"
-    } else {
-      return aiResponses[Math.floor(Math.random() * aiResponses.length)]
-    }
-  }
 
   useEffect(() => {
     // Initialize audio element
@@ -187,7 +166,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   }
 
   const fallbackToSpeechSynthesis = (text?: string) => {
-    const responseText = text || generateContextualResponse(lastUserInput)
+    const responseText = text || getNextResponse()
 
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel()
@@ -234,11 +213,18 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }
 
+  const getNextResponse = () => {
+    // Cycle through responses or pick randomly
+    const response = aiResponses[responseCount % aiResponses.length]
+    setResponseCount((prev) => prev + 1)
+    return response
+  }
+
   const speakAIResponse = async (userInput: string) => {
     if (!audioRef.current) return
 
     try {
-      const responseText = generateContextualResponse(userInput)
+      const responseText = getNextResponse()
 
       console.log("User said:", userInput)
       console.log("AI responding:", responseText)
@@ -353,36 +339,25 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           <div className="text-center mb-8">
             <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg">
               {isProcessing
-                ? "Processing..."
+                ? "Thinking..."
                 : isSpeaking
                   ? "Speaking..."
                   : isListening
                     ? "I'm listening..."
                     : speechSupported
-                      ? "Tap mic to speak"
+                      ? "Tap mic to chat"
                       : "Tap mic for demo"}
             </h1>
 
-            {/* Show speech support status */}
-            {!speechSupported && (
-              <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
-                <p className="text-white text-sm">Demo mode - I can still respond to you!</p>
-              </div>
-            )}
-
-            {/* Show user transcript while listening */}
-            {isListening && (
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
-                <p className="text-white text-sm">{userTranscript || "Listening..."}</p>
-              </div>
-            )}
-
-            {/* Show last user input */}
-            {lastUserInput && !isListening && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
-                <p className="text-white/80 text-sm">You said: "{lastUserInput}"</p>
-              </div>
-            )}
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
+              <p className="text-white/80 text-sm">
+                {isProcessing
+                  ? "Generating response..."
+                  : isSpeaking
+                    ? "AI is speaking..."
+                    : "Ready to chat! Tap the microphone to hear from me."}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -396,6 +371,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               onClick={() => {
                 setLastUserInput("")
                 setUserTranscript("")
+                setResponseCount(0)
               }}
             >
               <X className="w-6 h-6" />
