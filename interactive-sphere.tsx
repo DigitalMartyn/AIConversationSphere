@@ -3,7 +3,7 @@
 import { useRef, useMemo } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, ContactShadows, Environment } from "@react-three/drei"
-import { CanvasTexture, BufferGeometry, Float32BufferAttribute, PointsMaterial, AdditiveBlending } from "three"
+import { CanvasTexture, AdditiveBlending } from "three"
 
 export default function Component() {
   return (
@@ -53,10 +53,10 @@ function FloatingParticles() {
   const particleCount = 150
 
   // Create particle positions and properties
-  const { positions, colors, sizes } = useMemo(() => {
+  const particleData = useMemo(() => {
     const positions = new Float32Array(particleCount * 3)
     const colors = new Float32Array(particleCount * 3)
-    const sizes = new Float32Array(particleCount)
+    const originalPositions = new Float32Array(particleCount * 3)
 
     const gradientColors = [
       [1.0, 0.08, 0.58], // Deep pink
@@ -71,9 +71,18 @@ function FloatingParticles() {
       const theta = Math.random() * Math.PI * 2 // Horizontal angle
       const phi = Math.random() * Math.PI // Vertical angle
 
-      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
-      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
-      positions[i * 3 + 2] = radius * Math.cos(phi)
+      const x = radius * Math.sin(phi) * Math.cos(theta)
+      const y = radius * Math.sin(phi) * Math.sin(theta)
+      const z = radius * Math.cos(phi)
+
+      positions[i * 3] = x
+      positions[i * 3 + 1] = y
+      positions[i * 3 + 2] = z
+
+      // Store original positions for animation reference
+      originalPositions[i * 3] = x
+      originalPositions[i * 3 + 1] = y
+      originalPositions[i * 3 + 2] = z
 
       // Assign random gradient colors
       const colorIndex = Math.floor(Math.random() * gradientColors.length)
@@ -81,36 +90,13 @@ function FloatingParticles() {
       colors[i * 3] = color[0]
       colors[i * 3 + 1] = color[1]
       colors[i * 3 + 2] = color[2]
-
-      // Random sizes
-      sizes[i] = Math.random() * 8 + 2
     }
 
-    return { positions, colors, sizes }
-  }, [])
-
-  // Create geometry and material
-  const particleGeometry = useMemo(() => {
-    const geometry = new BufferGeometry()
-    geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))
-    geometry.setAttribute("color", new Float32BufferAttribute(colors, 3))
-    geometry.setAttribute("size", new Float32BufferAttribute(sizes, 1))
-    return geometry
-  }, [positions, colors, sizes])
-
-  const particleMaterial = useMemo(() => {
-    return new PointsMaterial({
-      size: 0.05,
-      vertexColors: true,
-      blending: AdditiveBlending,
-      transparent: true,
-      opacity: 0.8,
-      sizeAttenuation: true,
-    })
+    return { positions, colors, originalPositions }
   }, [])
 
   useFrame((state) => {
-    if (particlesRef.current) {
+    if (particlesRef.current && particlesRef.current.geometry && particlesRef.current.geometry.attributes.position) {
       const positions = particlesRef.current.geometry.attributes.position.array
       const time = state.clock.elapsedTime
 
@@ -119,33 +105,50 @@ function FloatingParticles() {
         const i3 = i * 3
 
         // Get original position
-        const x = positions[i3]
-        const y = positions[i3 + 1]
-        const z = positions[i3 + 2]
+        const origX = particleData.originalPositions[i3]
+        const origY = particleData.originalPositions[i3 + 1]
+        const origZ = particleData.originalPositions[i3 + 2]
 
         // Add floating motion
-        positions[i3] = x + Math.sin(time * 0.5 + i * 0.1) * 0.02
-        positions[i3 + 1] = y + Math.cos(time * 0.3 + i * 0.15) * 0.03
-        positions[i3 + 2] = z + Math.sin(time * 0.4 + i * 0.2) * 0.025
+        positions[i3] = origX + Math.sin(time * 0.5 + i * 0.1) * 0.1
+        positions[i3 + 1] = origY + Math.cos(time * 0.3 + i * 0.15) * 0.15
+        positions[i3 + 2] = origZ + Math.sin(time * 0.4 + i * 0.2) * 0.1
 
         // Add orbital motion around the sphere
-        const orbitSpeed = 0.1
-        const orbitRadius = Math.sqrt(x * x + z * z)
-        const currentAngle = Math.atan2(z, x)
-        const newAngle = currentAngle + orbitSpeed * 0.01
+        const orbitSpeed = 0.02
+        const orbitRadius = Math.sqrt(origX * origX + origZ * origZ)
+        const currentAngle = Math.atan2(origZ, origX)
+        const newAngle = currentAngle + time * orbitSpeed
 
-        positions[i3] = orbitRadius * Math.cos(newAngle) + Math.sin(time * 0.5 + i * 0.1) * 0.02
-        positions[i3 + 2] = orbitRadius * Math.sin(newAngle) + Math.sin(time * 0.4 + i * 0.2) * 0.025
+        positions[i3] = orbitRadius * Math.cos(newAngle) + Math.sin(time * 0.5 + i * 0.1) * 0.1
+        positions[i3 + 2] = orbitRadius * Math.sin(newAngle) + Math.sin(time * 0.4 + i * 0.2) * 0.1
       }
 
       particlesRef.current.geometry.attributes.position.needsUpdate = true
-
-      // Rotate the entire particle system slowly
-      particlesRef.current.rotation.y = time * 0.05
     }
   })
 
-  return <points ref={particlesRef} geometry={particleGeometry} material={particleMaterial} />
+  return (
+    <points ref={particlesRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={particleCount}
+          array={particleData.positions}
+          itemSize={3}
+        />
+        <bufferAttribute attach="attributes-color" count={particleCount} array={particleData.colors} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.05}
+        vertexColors={true}
+        blending={AdditiveBlending}
+        transparent={true}
+        opacity={0.8}
+        sizeAttenuation={true}
+      />
+    </points>
+  )
 }
 
 function GradientSphere() {
