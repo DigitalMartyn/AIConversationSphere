@@ -63,7 +63,11 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   return (
     <div className="relative w-full h-screen overflow-hidden">
       {/* 3D Background */}
-      <div className="absolute inset-0">{React.cloneElement(children as React.ReactElement, { isSpeaking })}</div>
+      <div className="absolute inset-0">
+        {React.Children.map(children, (child) =>
+          React.isValidElement(child) ? React.cloneElement(child, { isSpeaking } as any) : child,
+        )}
+      </div>
 
       {/* Mobile UI Overlay - No Phone Frame */}
       <div className="absolute inset-0 flex flex-col" style={{ fontFamily: '"Segoe UI", system-ui, sans-serif' }}>
@@ -93,7 +97,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               size="icon"
               className={`rounded-full w-14 h-14 ${
                 isSpeaking
-                  ? "bg-blue-500 hover:bg-blue-600 text-white animate-pulse"
+                  ? "bg-blue-500 hover:bg-blue-600 text-white"
                   : isListening
                     ? "bg-red-500 hover:bg-red-600 text-white"
                     : "hover:bg-white/20 text-white"
