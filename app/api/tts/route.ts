@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: "tts-1",
-        voice: "alloy", // You can change this to: alloy, echo, fable, onyx, nova, shimmer
+        voice: "alloy",
         input: text,
         response_format: "mp3",
         speed: 1.0,
@@ -37,7 +37,6 @@ export async function POST(request: Request) {
       headers: {
         "Content-Type": "audio/mpeg",
         "Content-Length": audioBuffer.byteLength.toString(),
-        "Cache-Control": "public, max-age=3600", // Cache for 1 hour
       },
     })
   } catch (error) {
