@@ -1,39 +1,26 @@
 "use client"
 
 import React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Mic, X, Settings, Send, MicOff } from "lucide-react"
+import { MessageCircle, X, Settings, Send } from "lucide-react"
 
 interface MobileChatUIProps {
   children: React.ReactNode
 }
 
-// Define the SpeechRecognition type for TypeScript
-declare global {
-  interface Window {
-    SpeechRecognition: any
-    webkitSpeechRecognition: any
-  }
-}
-
 export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isListening, setIsListening] = useState(false)
   const [lastResponse, setLastResponse] = useState("")
   const [inputMessage, setInputMessage] = useState("")
   const [showTextInput, setShowTextInput] = useState(false)
-  const [speechRecognitionSupported, setSpeechRecognitionSupported] = useState(false)
-  const [currentTranscript, setCurrentTranscript] = useState("")
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const recognitionRef = useRef<any>(null)
 
-  // Initialize audio element and speech recognition
-  useEffect(() => {
-    // Initialize audio element
+  // Initialize audio element
+  React.useEffect(() => {
     audioRef.current = new Audio()
 
     audioRef.current.onplay = () => {
@@ -56,116 +43,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       fallbackToSpeechSynthesis()
     }
 
-    // Initialize speech recognition
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-
-      if (SpeechRecognition) {
-        try {
-          recognitionRef.current = new SpeechRecognition()
-
-          // Configure speech recognition - let browser use default language
-          recognitionRef.current.continuous = false
-          recognitionRef.current.interimResults = true
-          // Remove all language setting - let browser decide
-
-          recognitionRef.current.onstart = () => {
-            console.log("Speech recognition started")
-            setIsListening(true)
-            setCurrentTranscript("")
-          }
-
-          recognitionRef.current.onresult = (event: any) => {
-            let transcript = ""
-            let isFinal = false
-
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              transcript += event.results[i][0].transcript
-              if (event.results[i].isFinal) {
-                isFinal = true
-              }
-            }
-
-            setCurrentTranscript(transcript)
-            console.log("Transcript:", transcript, "Final:", isFinal)
-
-            // If we have a final result, process it
-            if (isFinal && transcript.trim()) {
-              setInputMessage(transcript.trim())
-              setIsListening(false)
-              // Auto-send the message after a short delay
-              setTimeout(() => {
-                sendMessage(transcript.trim())
-              }, 500)
-            }
-          }
-
-          recognitionRef.current.onend = () => {
-            console.log("Speech recognition ended")
-            setIsListening(false)
-
-            // If we have a transcript but it wasn't final, still use it
-            if (currentTranscript.trim() && !inputMessage) {
-              setInputMessage(currentTranscript.trim())
-              setTimeout(() => {
-                sendMessage(currentTranscript.trim())
-              }, 500)
-            }
-          }
-
-          recognitionRef.current.onerror = (event: any) => {
-            console.error("Speech recognition error:", event.error)
-            setIsListening(false)
-
-            // Handle specific errors with user-friendly messages
-            switch (event.error) {
-              case "not-allowed":
-                console.log("Microphone access denied")
-                setSpeechRecognitionSupported(false)
-                break
-              case "no-speech":
-                console.log("No speech detected - this is normal")
-                break
-              case "language-not-supported":
-                console.warn("Language not supported - disabling speech recognition")
-                setSpeechRecognitionSupported(false)
-                break
-              case "network":
-                console.log("Network error during speech recognition")
-                break
-              case "audio-capture":
-                console.log("Microphone error")
-                setSpeechRecognitionSupported(false)
-                break
-              case "aborted":
-                console.log("Speech recognition was aborted")
-                break
-              default:
-                console.log("Speech recognition error:", event.error)
-                break
-            }
-          }
-
-          setSpeechRecognitionSupported(true)
-          console.log("Speech recognition initialized successfully")
-        } catch (error) {
-          console.error("Error initializing speech recognition:", error)
-          setSpeechRecognitionSupported(false)
-        }
-      } else {
-        console.warn("Speech recognition not supported in this browser")
-        setSpeechRecognitionSupported(false)
-      }
-    }
-
     return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop()
-        } catch (e) {
-          console.log("Error stopping recognition:", e)
-        }
-      }
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current = null
@@ -264,32 +142,17 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }
 
-  const startListening = () => {
-    if (!speechRecognitionSupported) {
-      alert("Speech recognition is not supported in your browser. Please use the text input instead.")
-      return
-    }
+  const sendTestMessage = async () => {
+    const testMessages = [
+      "Hello! Please introduce yourself and tell me what you can help me with.",
+      "What's the weather like today?",
+      "Tell me a fun fact about space.",
+      "How can you help me be more productive?",
+      "What's your favorite programming language and why?",
+    ]
 
-    if (recognitionRef.current && !isListening && !isSpeaking && !isProcessing) {
-      try {
-        setCurrentTranscript("")
-        setInputMessage("")
-        recognitionRef.current.start()
-      } catch (error) {
-        console.error("Error starting speech recognition:", error)
-        alert("Could not start speech recognition. Please try again.")
-      }
-    }
-  }
-
-  const stopListening = () => {
-    if (recognitionRef.current && isListening) {
-      try {
-        recognitionRef.current.stop()
-      } catch (error) {
-        console.error("Error stopping speech recognition:", error)
-      }
-    }
+    const randomMessage = testMessages[Math.floor(Math.random() * testMessages.length)]
+    await sendMessage(randomMessage)
   }
 
   const handleTextSubmit = async (e: React.FormEvent) => {
@@ -313,13 +176,11 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     setIsProcessing(false)
   }
 
-  const handleMicClick = () => {
+  const handleChatClick = () => {
     if (isSpeaking) {
       stopSpeaking()
-    } else if (isListening) {
-      stopListening()
     } else {
-      startListening()
+      sendTestMessage()
     }
   }
 
@@ -337,10 +198,8 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   const clearAll = () => {
     setLastResponse("")
     setInputMessage("")
-    setCurrentTranscript("")
     setShowTextInput(false)
     stopSpeaking()
-    stopListening()
   }
 
   return (
@@ -348,9 +207,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       {/* 3D Background */}
       <div className="absolute inset-0">
         {React.Children.map(children, (child) =>
-          React.isValidElement(child)
-            ? React.cloneElement(child, { isSpeaking: isSpeaking || isListening } as any)
-            : child,
+          React.isValidElement(child) ? React.cloneElement(child, { isSpeaking: isSpeaking } as any) : child,
         )}
       </div>
 
@@ -360,24 +217,11 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
         <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 z-10">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg">
-              {isProcessing
-                ? "Processing..."
-                : isSpeaking
-                  ? "AI Speaking..."
-                  : isListening
-                    ? "Listening..."
-                    : "Speak or Type to Chat"}
+              {isProcessing ? "Asking AI..." : isSpeaking ? "AI Speaking..." : "Chat with AI"}
             </h1>
 
-            {/* Show current transcript while listening */}
-            {isListening && (
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
-                <p className="text-white text-sm">{currentTranscript || "Listening..."}</p>
-              </div>
-            )}
-
             {/* Show last user input */}
-            {inputMessage && !isListening && (
+            {inputMessage && (
               <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
                 <p className="text-white/90 text-sm">You: "{inputMessage}"</p>
               </div>
@@ -414,10 +258,12 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               </div>
             )}
 
-            {/* Speech recognition status */}
-            {!speechRecognitionSupported && (
-              <div className="bg-yellow-500/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
-                <p className="text-white text-sm">Speech recognition not available. Use text input instead.</p>
+            {/* Instructions */}
+            {!lastResponse && !showTextInput && (
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
+                <p className="text-white/70 text-sm">
+                  Tap the chat button for a random AI conversation, or use the settings button to type your own message.
+                </p>
               </div>
             )}
           </div>
@@ -443,16 +289,12 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                   ? "bg-purple-500 hover:bg-purple-600 text-white"
                   : isSpeaking
                     ? "bg-blue-500 hover:bg-blue-600 text-white"
-                    : isListening
-                      ? "bg-red-500 hover:bg-red-600 text-white"
-                      : speechRecognitionSupported
-                        ? "hover:bg-white/20 text-white"
-                        : "bg-gray-500 text-gray-300"
+                    : "hover:bg-white/20 text-white"
               }`}
-              disabled={isProcessing || !speechRecognitionSupported}
-              onClick={handleMicClick}
+              disabled={isProcessing}
+              onClick={handleChatClick}
             >
-              {isListening ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
+              <MessageCircle className="w-7 h-7" />
             </Button>
 
             <Button
