@@ -97,157 +97,6 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           addDebugMessage(`- maxAlternatives: ${recognition.maxAlternatives || "not set"}`)
           addDebugMessage(`- serviceURI: ${recognition.serviceURI || "not set"}`)
 
-          // Configure speech recognition
-          recognition.continuous = false
-          recognition.interimResults = true
-
-          // Set language directly - use the first supported language
-          const supportedLanguages = ["en", "en-GB", "en-US"]
-          const browserLanguages = navigator.languages || [navigator.language || "en"]
-          addDebugMessage(`Browser languages: ${browserLanguages.join(", ")}`)
-          addDebugMessage(`Supported languages: ${supportedLanguages.join(", ")}`)
-
-          // Find the first matching language
-          let selectedLanguage = "en" // Default fallback
-
-          for (const browserLang of browserLanguages) {
-            // Check exact match first
-            if (supportedLanguages.includes(browserLang)) {
-              selectedLanguage = browserLang
-              break
-            }
-            // Check language code match (e.g., 'en' from 'en-US')
-            const langCode = browserLang.split("-")[0]
-            const match = supportedLanguages.find((lang) => lang.startsWith(langCode))
-            if (match) {
-              selectedLanguage = match
-              break
-            }
-          }
-
-          // Set the language explicitly
-          recognition.lang = selectedLanguage
-          addDebugMessage(`Setting language to: ${selectedLanguage}`)
-          addDebugMessage(`Language set successfully: ${recognition.lang}`)
-
-          recognition.onstart = () => {
-            addDebugMessage("Speech recognition started successfully")
-            setIsListening(true)
-            setCurrentTranscript("")
-          }
-
-          recognition.onresult = (event: any) => {
-            addDebugMessage(`Recognition result event: ${event.results.length} results`)
-
-            let transcript = ""
-            let isFinal = false
-
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              const result = event.results[i]
-              transcript += result[0].transcript
-              addDebugMessage(
-                `Result ${i}: "${result[0].transcript}" (confidence: ${result[0].confidence}, final: ${result.isFinal})`,
-              )
-
-              if (result.isFinal) {
-                isFinal = true
-              }
-            }
-
-            setCurrentTranscript(transcript)
-            addDebugMessage(`Full transcript: "${transcript}", Final: ${isFinal}`)
-
-            // If we have a final result, process it
-            if (isFinal && transcript.trim()) {
-              setInputMessage(transcript.trim())
-              setIsListening(false)
-              addDebugMessage(`Processing final transcript: "${transcript.trim()}"`)
-              // Auto-send the message after a short delay
-              setTimeout(() => {
-                sendMessage(transcript.trim())
-              }, 500)
-            }
-          }
-
-          recognition.onend = () => {
-            addDebugMessage("Speech recognition ended")
-            setIsListening(false)
-
-            // If we have a transcript but it wasn't final, still use it
-            if (currentTranscript.trim() && !inputMessage) {
-              addDebugMessage(`Using non-final transcript: "${currentTranscript.trim()}"`)
-              setInputMessage(currentTranscript.trim())
-              setTimeout(() => {
-                sendMessage(currentTranscript.trim())
-              }, 500)
-            }
-          }
-
-          recognition.onerror = (event: any) => {
-            const errorMsg = `Speech recognition error: ${event.error}`
-            addDebugMessage(errorMsg)
-            addDebugMessage(`Error details: ${JSON.stringify(event)}`)
-
-            setIsListening(false)
-
-            // Handle specific errors with detailed logging
-            switch (event.error) {
-              case "not-allowed":
-                addDebugMessage("Microphone permission denied")
-                setSpeechRecognitionSupported(false)
-                break
-              case "no-speech":
-                addDebugMessage("No speech detected - this is normal")
-                break
-              case "language-not-supported":
-                addDebugMessage(`Language not supported. Current lang: ${recognition.lang}`)
-                addDebugMessage(`Browser language: ${navigator.language}`)
-                addDebugMessage(`Available languages: ${navigator.languages?.join(", ") || "Unknown"}`)
-                break
-              case "network":
-                addDebugMessage("Network error during speech recognition")
-                break
-              case "audio-capture":
-                addDebugMessage("Audio capture error - microphone issue")
-                setSpeechRecognitionSupported(false)
-                break
-              case "aborted":
-                addDebugMessage("Speech recognition was aborted")
-                break
-              default:
-                addDebugMessage(`Unknown error: ${event.error}`)
-                break
-            }
-          }
-
-          recognition.onspeechstart = () => {
-            addDebugMessage("Speech detected - user started speaking")
-          }
-
-          recognition.onspeechend = () => {
-            addDebugMessage("Speech ended - user stopped speaking")
-          }
-
-          recognition.onsoundstart = () => {
-            addDebugMessage("Sound detected")
-          }
-
-          recognition.onsoundend = () => {
-            addDebugMessage("Sound ended")
-          }
-
-          recognition.onaudiostart = () => {
-            addDebugMessage("Audio capture started")
-          }
-
-          recognition.onaudioend = () => {
-            addDebugMessage("Audio capture ended")
-          }
-
-          recognition.onnomatch = () => {
-            addDebugMessage("No speech match found")
-          }
-
           setSpeechRecognitionSupported(true)
           addDebugMessage("Speech recognition initialized successfully")
         } catch (error) {
@@ -375,8 +224,34 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
 
     if (recognitionRef.current && !isListening && !isSpeaking && !isProcessing) {
-      // Test languages in order of preference
-      const testLanguages = ["en-US", "en-GB", "en", null] // null = no language set
+      // Comprehensive list of language options to test
+      const testLanguages = [
+        // Start with browser languages
+        ...navigator.languages,
+        // Common English variants
+        "en-US",
+        "en-GB",
+        "en-AU",
+        "en-CA",
+        "en-IN",
+        "en-NZ",
+        "en-ZA",
+        "en",
+        // Try without any language (browser default)
+        null,
+        // Try empty string
+        "",
+        // Try undefined explicitly
+        undefined,
+      ]
+
+      // Remove duplicates and null/undefined values for logging
+      const uniqueLanguages = [
+        ...new Set(testLanguages.filter((lang) => lang !== null && lang !== undefined && lang !== "")),
+      ]
+      addDebugMessage(
+        `Will test ${testLanguages.length} language options: ${uniqueLanguages.join(", ")}, plus null/undefined/empty`,
+      )
 
       for (let i = 0; i < testLanguages.length; i++) {
         const lang = testLanguages[i]
@@ -393,12 +268,14 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           newRecognition.interimResults = true
 
           // Set language if specified
-          if (lang) {
+          if (lang !== null && lang !== undefined && lang !== "") {
             newRecognition.lang = lang
-            addDebugMessage(`Set language to: ${lang}`)
+            addDebugMessage(`Set language property to: "${lang}"`)
           } else {
-            addDebugMessage(`Using browser default language (no lang property set)`)
+            addDebugMessage(`Not setting language property (using browser default)`)
           }
+
+          addDebugMessage(`Current lang property: "${newRecognition.lang || "undefined"}"`)
 
           // Create a promise to handle the async nature of speech recognition
           const recognitionPromise = new Promise((resolve, reject) => {
@@ -416,6 +293,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
             newRecognition.onerror = (event: any) => {
               addDebugMessage(`❌ ERROR: Language ${lang || "default"} failed with: ${event.error}`)
+              addDebugMessage(`Error event details: ${JSON.stringify(event)}`)
               hasErrored = true
 
               if (event.error === "language-not-supported") {
@@ -507,13 +385,13 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               addDebugMessage("No speech match found")
             }
 
-            // Timeout after 2 seconds if no start event
+            // Timeout after 3 seconds if no start event
             setTimeout(() => {
               if (!hasStarted && !hasErrored) {
-                addDebugMessage(`Timeout waiting for language ${lang || "default"} to start`)
+                addDebugMessage(`⏰ Timeout waiting for language ${lang || "default"} to start`)
                 reject(new Error("timeout"))
               }
-            }, 2000)
+            }, 3000)
           })
 
           // Replace the old recognition instance
@@ -523,7 +401,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           setInputMessage("")
 
           // Try to start recognition
-          addDebugMessage(`Starting recognition with language: ${lang || "default"}`)
+          addDebugMessage(`🚀 Starting recognition attempt...`)
           newRecognition.start()
 
           // Wait for the promise to resolve or reject
@@ -552,7 +430,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           }
 
           // Continue to next language
-          addDebugMessage(`Continuing to next language option...`)
+          addDebugMessage(`➡️ Continuing to next language option...`)
           continue
         }
       }
@@ -764,7 +642,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
             <Button
               variant="ghost"
               size="icon"
-              className={`rounded-full w-12 h-12 hover:bg-white/20 text-white ${showTextInput ? "bg-white/20" : ""}`}
+              className={`rounded-round w-12 h-12 hover:bg-white/20 text-white ${showTextInput ? "bg-white/20" : ""}`}
               onClick={toggleTextInput}
             >
               <Settings className="w-6 h-6" />
