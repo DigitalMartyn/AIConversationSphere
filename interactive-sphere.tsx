@@ -2,7 +2,7 @@
 
 import { useRef, useMemo } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
-import { OrbitControls, Environment } from "@react-three/drei"
+import { OrbitControls, ContactShadows, Environment } from "@react-three/drei"
 import { CanvasTexture, AdditiveBlending } from "three"
 
 export default function Component() {
@@ -10,21 +10,7 @@ export default function Component() {
     <div className="w-full h-screen" style={{ backgroundColor: "#c4b5fd" }}>
       <Canvas camera={{ position: [0, 0, 5], fov: 45 }} shadows>
         <ambientLight intensity={0.6} color="#f5f0ff" />
-        <directionalLight
-          position={[5, 5, 5]}
-          intensity={1.2}
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-camera-near={0.1}
-          shadow-camera-far={50}
-          shadow-camera-left={-10}
-          shadow-camera-right={10}
-          shadow-camera-top={10}
-          shadow-camera-bottom={-10}
-          shadow-bias={-0.0001}
-          color="#ffffff"
-        />
+        <directionalLight position={[5, 5, 5]} intensity={1.2} color="#ffffff" />
         <pointLight position={[-3, 2, 3]} intensity={0.5} color="#ff69b4" />
         <pointLight position={[3, 2, -3]} intensity={0.5} color="#87ceeb" />
 
@@ -39,11 +25,7 @@ export default function Component() {
         <GradientSphere />
         <FloatingParticles />
 
-        {/* Ground plane for shadows */}
-        <mesh position={[0, -2.5, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[20, 20]} />
-          <meshLambertMaterial color="#c4b5fd" transparent opacity={0.1} />
-        </mesh>
+        <ContactShadows position={[0, -2.5, 0]} opacity={0.4} scale={8} blur={2.5} far={2.5} />
 
         <OrbitControls
           enablePan={false}
