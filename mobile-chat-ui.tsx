@@ -3,7 +3,8 @@
 import React from "react"
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Mic, X, Settings } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Mic, X, Settings, Send } from "lucide-react"
 
 interface MobileChatUIProps {
   children: React.ReactNode
@@ -13,6 +14,8 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [lastResponse, setLastResponse] = useState("")
+  const [inputMessage, setInputMessage] = useState("")
+  const [showTextInput, setShowTextInput] = useState(false)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
@@ -79,22 +82,22 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }
 
-  const sendTestMessage = async () => {
-    if (isProcessing || isSpeaking) return
+  const sendMessage = async (message: string) => {
+    if (isProcessing || isSpeaking || !message.trim()) return
 
     setIsProcessing(true)
 
     try {
-      console.log("Sending test message to OpenAI...")
+      console.log("Sending message to OpenAI:", message)
 
-      // Send test message to OpenAI
+      // Send message to OpenAI
       const chatResponse = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          message: "Hello! Please introduce yourself and tell me what you can help me with.",
+          message: message.trim(),
         }),
       })
 
@@ -133,10 +136,22 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       }
     } catch (error) {
       console.error("Error:", error)
-      const fallbackText =
-        "Hello! I'm your AI assistant. I'm here to help you with questions, creative tasks, and problem-solving. How can I assist you today?"
+      const fallbackText = "Sorry, I encountered an error while processing your message. Please try again."
       setLastResponse(fallbackText)
       fallbackToSpeechSynthesis(fallbackText)
+    }
+  }
+
+  const sendTestMessage = async () => {
+    await sendMessage("Hello! Please introduce yourself and tell me what you can help me with.")
+  }
+
+  const handleTextSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (inputMessage.trim()) {
+      await sendMessage(inputMessage)
+      setInputMessage("")
+      setShowTextInput(false)
     }
   }
 
@@ -160,6 +175,17 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }
 
+  const toggleTextInput = () => {
+    setShowTextInput(!showTextInput)
+    if (!showTextInput) {
+      // Focus the input when showing it
+      setTimeout(() => {
+        const input = document.querySelector('input[type="text"]') as HTMLInputElement
+        if (input) input.focus()
+      }, 100)
+    }
+  }
+
   return (
     <div className="relative w-full h-screen overflow-hidden">
       {/* 3D Background */}
@@ -175,12 +201,36 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
         <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 z-10">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg">
-              {isProcessing ? "Asking OpenAI..." : isSpeaking ? "AI Speaking..." : "Tap mic to test OpenAI"}
+              {isProcessing ? "Asking OpenAI..." : isSpeaking ? "AI Speaking..." : "Chat with AI"}
             </h1>
 
             {lastResponse && (
               <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
                 <p className="text-white/80 text-sm">"{lastResponse}"</p>
+              </div>
+            )}
+
+            {/* Text Input Area */}
+            {showTextInput && (
+              <div className="mt-6 w-full max-w-md">
+                <form onSubmit={handleTextSubmit} className="flex gap-2">
+                  <Input
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    placeholder="Type your message..."
+                    className="flex-1 bg-white/20 backdrop-blur-sm border-white/30 text-white placeholder:text-white/60"
+                    disabled={isProcessing}
+                  />
+                  <Button
+                    type="submit"
+                    size="icon"
+                    className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                    disabled={isProcessing || !inputMessage.trim()}
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </form>
               </div>
             )}
           </div>
@@ -195,6 +245,8 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               className="rounded-full w-12 h-12 hover:bg-white/20 text-white"
               onClick={() => {
                 setLastResponse("")
+                setInputMessage("")
+                setShowTextInput(false)
                 stopSpeaking()
               }}
             >
@@ -217,7 +269,12 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               <Mic className="w-7 h-7" />
             </Button>
 
-            <Button variant="ghost" size="icon" className="rounded-full w-12 h-12 hover:bg-white/20 text-white">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`rounded-full w-12 h-12 hover:bg-white/20 text-white ${showTextInput ? "bg-white/20" : ""}`}
+              onClick={toggleTextInput}
+            >
               <Settings className="w-6 h-6" />
             </Button>
           </div>
