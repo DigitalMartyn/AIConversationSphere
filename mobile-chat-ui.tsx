@@ -23,6 +23,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [userTranscript, setUserTranscript] = useState("")
   const [lastUserInput, setLastUserInput] = useState("")
+  const [speechSupported, setSpeechSupported] = useState(true)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const recognitionRef = useRef<any>(null)
@@ -59,9 +60,54 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     } else if (input.includes("learn") || input.includes("teach")) {
       return "I love helping people learn! What subject or skill are you interested in?"
     } else {
-      // Return a contextual response that acknowledges their input
       return aiResponses[Math.floor(Math.random() * aiResponses.length)]
     }
+  }
+
+  // Get the best supported language
+  const getSupportedLanguage = () => {
+    const userLang = navigator.language || "en-US"
+
+    // Common language codes that are widely supported
+    const supportedLanguages = [
+      "en-US",
+      "en-GB",
+      "en-AU",
+      "en-CA",
+      "en-IN",
+      "en-NZ",
+      "en-ZA",
+      "es-ES",
+      "es-MX",
+      "fr-FR",
+      "de-DE",
+      "it-IT",
+      "pt-BR",
+      "pt-PT",
+      "ru-RU",
+      "ja-JP",
+      "ko-KR",
+      "zh-CN",
+      "zh-TW",
+      "ar-SA",
+      "hi-IN",
+    ]
+
+    // Try exact match first
+    if (supportedLanguages.includes(userLang)) {
+      return userLang
+    }
+
+    // Try language without region
+    const langCode = userLang.split("-")[0]
+    const fallbackLang = supportedLanguages.find((lang) => lang.startsWith(langCode))
+
+    if (fallbackLang) {
+      return fallbackLang
+    }
+
+    // Default to US English
+    return "en-US"
   }
 
   useEffect(() => {
@@ -90,44 +136,98 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
     // Initialize speech recognition
     if (typeof window !== "undefined") {
-      // Use the appropriate SpeechRecognition constructor
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
 
       if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition()
+        try {
+          recognitionRef.current = new SpeechRecognition()
 
-        recognitionRef.current.continuous = false
-        recognitionRef.current.interimResults = true
-        recognitionRef.current.lang = "en-US"
+          // Configure recognition with better settings
+          recognitionRef.current.continuous = false
+          recognitionRef.current.interimResults = true
+          recognitionRef.current.maxAlternatives = 1
 
-        recognitionRef.current.onstart = () => {
-          setIsListening(true)
-          setUserTranscript("")
-        }
+          // Use the best supported language
+          const supportedLang = getSupportedLanguage()
+          recognitionRef.current.lang = supportedLang
+          console.log("Using speech recognition language:", supportedLang)
 
-        recognitionRef.current.onresult = (event: any) => {
-          let transcript = ""
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript
+          recognitionRef.current.onstart = () => {
+            console.log("Speech recognition started")
+            setIsListening(true)
+            setUserTranscript("")
+            setSpeechSupported(true)
           }
-          setUserTranscript(transcript)
-        }
 
-        recognitionRef.current.onend = () => {
-          setIsListening(false)
-          if (userTranscript.trim()) {
-            setLastUserInput(userTranscript)
-            handleUserSpeechComplete(userTranscript)
+          recognitionRef.current.onresult = (event: any) => {
+            let transcript = ""
+            let isFinal = false
+
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              transcript += event.results[i][0].transcript
+              if (event.results[i].isFinal) {
+                isFinal = true
+              }
+            }
+
+            setUserTranscript(transcript)
+            console.log("Transcript:", transcript, "Final:", isFinal)
           }
-        }
 
-        recognitionRef.current.onerror = (event: any) => {
-          console.error("Speech recognition error:", event.error)
-          setIsListening(false)
-          setIsProcessing(false)
+          recognitionRef.current.onend = () => {
+            console.log("Speech recognition ended")
+            setIsListening(false)
+
+            // Process the final transcript
+            if (userTranscript.trim()) {
+              setLastUserInput(userTranscript.trim())
+              handleUserSpeechComplete(userTranscript.trim())
+            }
+          }
+
+          recognitionRef.current.onerror = (event: any) => {
+            console.error("Speech recognition error:", event.error)
+            setIsListening(false)
+            setIsProcessing(false)
+
+            // Handle specific error types
+            switch (event.error) {
+              case "language-not-supported":
+                console.log("Language not supported, trying fallback")
+                // Try with a different language
+                if (recognitionRef.current.lang !== "en-US") {
+                  recognitionRef.current.lang = "en-US"
+                  console.log("Switched to en-US, retrying...")
+                } else {
+                  setSpeechSupported(false)
+                }
+                break
+              case "network":
+                console.log("Network error - speech recognition may not be available")
+                setSpeechSupported(false)
+                break
+              case "not-allowed":
+                console.log("Microphone access denied")
+                setSpeechSupported(false)
+                break
+              case "no-speech":
+                console.log("No speech detected")
+                break
+              default:
+                console.log("Speech recognition error:", event.error)
+            }
+          }
+
+          recognitionRef.current.onnomatch = () => {
+            console.log("No speech match found")
+          }
+        } catch (error) {
+          console.error("Error initializing speech recognition:", error)
+          setSpeechSupported(false)
         }
       } else {
         console.warn("Speech recognition not supported in this browser")
+        setSpeechSupported(false)
       }
     }
 
@@ -240,11 +340,19 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   }
 
   const startListening = () => {
+    if (!speechSupported) {
+      console.log("Speech recognition not supported")
+      return
+    }
+
     if (recognitionRef.current && !isListening && !isSpeaking && !isProcessing) {
       try {
+        // Reset transcript before starting
+        setUserTranscript("")
         recognitionRef.current.start()
       } catch (e) {
         console.error("Error starting speech recognition:", e)
+        setSpeechSupported(false)
       }
     }
   }
@@ -272,6 +380,17 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   }
 
   const handleMicClick = () => {
+    if (!speechSupported) {
+      // If speech recognition isn't supported, just trigger a demo response
+      setIsProcessing(true)
+      setTimeout(() => {
+        fallbackToSpeechSynthesis(
+          "I'm sorry, speech recognition isn't supported in your browser, but I can still speak to you!",
+        )
+      }, 500)
+      return
+    }
+
     if (isSpeaking) {
       stopSpeaking()
     } else if (isListening) {
@@ -281,12 +400,13 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }
 
-  // Update transcript when it changes
+  // Update transcript handling
   useEffect(() => {
-    if (isListening && userTranscript) {
-      console.log("Current transcript:", userTranscript)
+    if (!isListening && userTranscript.trim() && userTranscript !== lastUserInput) {
+      setLastUserInput(userTranscript.trim())
+      handleUserSpeechComplete(userTranscript.trim())
     }
-  }, [userTranscript, isListening])
+  }, [isListening, userTranscript])
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
@@ -305,14 +425,23 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
         <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 z-10">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg">
-              {isProcessing
-                ? "Processing..."
-                : isSpeaking
-                  ? "Speaking..."
-                  : isListening
-                    ? "I'm listening..."
-                    : "Tap mic to speak"}
+              {!speechSupported
+                ? "Tap mic for demo"
+                : isProcessing
+                  ? "Processing..."
+                  : isSpeaking
+                    ? "Speaking..."
+                    : isListening
+                      ? "I'm listening..."
+                      : "Tap mic to speak"}
             </h1>
+
+            {/* Show speech support warning */}
+            {!speechSupported && (
+              <div className="bg-yellow-500/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
+                <p className="text-white text-sm">Speech recognition not available, but I can still respond!</p>
+              </div>
+            )}
 
             {/* Show user transcript while listening */}
             {isListening && userTranscript && (
