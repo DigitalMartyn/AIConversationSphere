@@ -103,18 +103,18 @@ function FloatingParticles() {
         const origZ = particleData.originalPositions[i3 + 2]
 
         // Add floating motion
-        positions[i3] = origX + Math.sin(time * 0.25 + i * 0.1) * 0.1
-        positions[i3 + 1] = origY + Math.cos(time * 0.15 + i * 0.15) * 0.15
-        positions[i3 + 2] = origZ + Math.sin(time * 0.2 + i * 0.2) * 0.1
+        positions[i3] = origX + Math.sin(time * 0.1 + i * 0.1) * 0.1
+        positions[i3 + 1] = origY + Math.cos(time * 0.06 + i * 0.15) * 0.15
+        positions[i3 + 2] = origZ + Math.sin(time * 0.08 + i * 0.2) * 0.1
 
         // Add orbital motion around the sphere
-        const orbitSpeed = 0.01
+        const orbitSpeed = 0.004
         const orbitRadius = Math.sqrt(origX * origX + origZ * origZ)
         const currentAngle = Math.atan2(origZ, origX)
         const newAngle = currentAngle + time * orbitSpeed
 
-        positions[i3] = orbitRadius * Math.cos(newAngle) + Math.sin(time * 0.25 + i * 0.1) * 0.1
-        positions[i3 + 2] = orbitRadius * Math.sin(newAngle) + Math.sin(time * 0.2 + i * 0.2) * 0.1
+        positions[i3] = orbitRadius * Math.cos(newAngle) + Math.sin(time * 0.1 + i * 0.1) * 0.1
+        positions[i3 + 2] = orbitRadius * Math.sin(newAngle) + Math.sin(time * 0.08 + i * 0.2) * 0.1
       }
 
       particlesRef.current.geometry.attributes.position.needsUpdate = true
