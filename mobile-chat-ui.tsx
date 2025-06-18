@@ -44,41 +44,93 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }, [])
 
-  const speakWithOpenAI = async () => {
-    if (!audioRef.current) return
+  const speakWithBrowserAPI = (text: string) => {
+    return new Promise<void>((resolve, reject) => {
+      if ("speechSynthesis" in window) {
+        // Stop any current speech
+        window.speechSynthesis.cancel()
 
-    // Stop any current speech
-    audioRef.current.pause()
+        const utterance = new SpeechSynthesisUtterance(text)
+
+        // Configure for better quality
+        utterance.rate = 0.9
+        utterance.pitch = 1.0
+        utterance.volume = 0.8
+
+        // Try to use a higher quality voice if available
+        const voices = window.speechSynthesis.getVoices()
+        const preferredVoice = voices.find(
+          (voice) =>
+            voice.name.includes("Google") ||
+            voice.name.includes("Microsoft") ||
+            voice.name.includes("Alex") ||
+            voice.name.includes("Samantha"),
+        )
+        if (preferredVoice) {
+          utterance.voice = preferredVoice
+        }
+
+        utterance.onstart = () => {
+          setIsSpeaking(true)
+          setIsLoading(false)
+        }
+
+        utterance.onend = () => {
+          setIsSpeaking(false)
+          resolve()
+        }
+
+        utterance.onerror = (error) => {
+          setIsSpeaking(false)
+          setIsLoading(false)
+          reject(error)
+        }
+
+        window.speechSynthesis.speak(utterance)
+      } else {
+        reject(new Error("Speech synthesis not supported"))
+      }
+    })
+  }
+
+  const speakWithOpenAI = async () => {
     setIsLoading(true)
+    setIsListening(false)
 
     try {
       // Get a random response
       const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)]
 
-      // In a real implementation, you would call the OpenAI TTS API here
-      // For this demo, we'll simulate the API call with a timeout
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      // Try OpenAI TTS API first (when implemented)
+      try {
+        const response = await fetch("/api/tts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text: randomResponse }),
+        })
 
-      // For demo purposes, we'll use a pre-recorded TTS sample
-      // In a real implementation, this would be the URL returned from the OpenAI API
-      const ttsUrl = "https://cdn.openai.com/API/docs/audio/tts-demo-1.mp3"
+        if (response.ok) {
+          const data = await response.json()
 
-      audioRef.current.src = ttsUrl
-      await audioRef.current.play()
-
-      setIsListening(false)
-      setIsLoading(false)
-    } catch (error) {
-      console.error("Error playing audio:", error)
-      setIsLoading(false)
-
-      // Fallback to browser's speech synthesis
-      if ("speechSynthesis" in window) {
-        const utterance = new SpeechSynthesisUtterance(aiResponses[Math.floor(Math.random() * aiResponses.length)])
-        utterance.onstart = () => setIsSpeaking(true)
-        utterance.onend = () => setIsSpeaking(false)
-        window.speechSynthesis.speak(utterance)
+          if (data.url && audioRef.current) {
+            audioRef.current.src = data.url
+            await audioRef.current.play()
+            setIsLoading(false)
+            return
+          }
+        }
+      } catch (apiError) {
+        console.log("OpenAI TTS not available, using browser speech synthesis")
       }
+
+      // Fallback to browser speech synthesis
+      await speakWithBrowserAPI(randomResponse)
+    } catch (error) {
+      console.error("Error with speech:", error)
+      setIsLoading(false)
+      setIsSpeaking(false)
     }
   }
 
@@ -90,6 +142,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       window.speechSynthesis.cancel()
     }
     setIsSpeaking(false)
+    setIsLoading(false)
   }
 
   return (
@@ -142,10 +195,9 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                       ? "bg-red-500 hover:bg-red-600 text-white"
                       : "hover:bg-white/20 text-white"
               }`}
+              disabled={isLoading}
               onClick={() => {
-                if (isLoading) {
-                  return // Do nothing while loading
-                } else if (isSpeaking) {
+                if (isSpeaking) {
                   stopSpeaking()
                 } else if (isListening) {
                   setIsListening(false)
