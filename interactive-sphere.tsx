@@ -103,23 +103,41 @@ function FloatingParticles() {
         const origZ = particleData.originalPositions[i3 + 2]
 
         // Add floating motion
-        positions[i3] = origX + Math.sin(time * 0.5 + i * 0.1) * 0.1
-        positions[i3 + 1] = origY + Math.cos(time * 0.3 + i * 0.15) * 0.15
-        positions[i3 + 2] = origZ + Math.sin(time * 0.4 + i * 0.2) * 0.1
+        positions[i3] = origX + Math.sin(time * 0.25 + i * 0.1) * 0.1
+        positions[i3 + 1] = origY + Math.cos(time * 0.15 + i * 0.15) * 0.15
+        positions[i3 + 2] = origZ + Math.sin(time * 0.2 + i * 0.2) * 0.1
 
         // Add orbital motion around the sphere
-        const orbitSpeed = 0.02
+        const orbitSpeed = 0.01
         const orbitRadius = Math.sqrt(origX * origX + origZ * origZ)
         const currentAngle = Math.atan2(origZ, origX)
         const newAngle = currentAngle + time * orbitSpeed
 
-        positions[i3] = orbitRadius * Math.cos(newAngle) + Math.sin(time * 0.5 + i * 0.1) * 0.1
-        positions[i3 + 2] = orbitRadius * Math.sin(newAngle) + Math.sin(time * 0.4 + i * 0.2) * 0.1
+        positions[i3] = orbitRadius * Math.cos(newAngle) + Math.sin(time * 0.25 + i * 0.1) * 0.1
+        positions[i3 + 2] = orbitRadius * Math.sin(newAngle) + Math.sin(time * 0.2 + i * 0.2) * 0.1
       }
 
       particlesRef.current.geometry.attributes.position.needsUpdate = true
     }
   })
+
+  // Create circular texture for round particles
+  const circleTexture = useMemo(() => {
+    const canvas = document.createElement("canvas")
+    canvas.width = 64
+    canvas.height = 64
+    const context = canvas.getContext("2d")
+
+    const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32)
+    gradient.addColorStop(0, "rgba(255, 255, 255, 1)")
+    gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.5)")
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)")
+
+    context.fillStyle = gradient
+    context.fillRect(0, 0, 64, 64)
+
+    return new CanvasTexture(canvas)
+  }, [])
 
   return (
     <points ref={particlesRef}>
@@ -139,6 +157,7 @@ function FloatingParticles() {
         transparent={true}
         opacity={0.8}
         sizeAttenuation={true}
+        map={circleTexture}
       />
     </points>
   )
