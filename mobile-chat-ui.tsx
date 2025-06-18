@@ -4,6 +4,7 @@ import React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, X, Settings } from "lucide-react"
+import SpeechRecognition from "speech-recognition"
 
 interface MobileChatUIProps {
   children: React.ReactNode
@@ -12,28 +13,93 @@ interface MobileChatUIProps {
 export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [userTranscript, setUserTranscript] = useState("")
+  const [lastUserInput, setLastUserInput] = useState("")
+
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   const aiResponses = [
-    "Hello! I'm your AI assistant. How can I help you today?",
-    "I'm here to answer your questions and assist with various tasks.",
-    "Feel free to ask me anything - I'm ready to help!",
-    "I can help you with information, creative tasks, and problem-solving.",
-    "What would you like to know or explore together?",
-    "I'm powered by advanced AI technology and I'm here to make your day better.",
-    "Whether you need help with work, creativity, or just want to chat, I'm here for you.",
-    "I can assist with writing, analysis, problem-solving, and much more. What interests you?",
+    "That's interesting! Tell me more about that.",
+    "I understand what you're saying. How can I help you with that?",
+    "Thanks for sharing that with me. What would you like to know?",
+    "I hear you! That sounds important to you.",
+    "That's a great point. Let me think about how I can assist you.",
+    "I appreciate you telling me that. What's your main question?",
+    "Interesting perspective! How can I support you with this?",
+    "I'm listening and I want to help. What do you need from me?",
   ]
 
+  // Generate contextual response based on user input
+  const generateContextualResponse = (userInput: string) => {
+    const input = userInput.toLowerCase()
+
+    if (input.includes("hello") || input.includes("hi") || input.includes("hey")) {
+      return "Hello! It's great to hear from you. How can I help you today?"
+    } else if (input.includes("help") || input.includes("assist")) {
+      return "I'm here to help! What do you need assistance with?"
+    } else if (input.includes("how are you") || input.includes("how's it going")) {
+      return "I'm doing well, thank you for asking! How are you doing today?"
+    } else if (input.includes("thank")) {
+      return "You're very welcome! Is there anything else I can help you with?"
+    } else if (input.includes("question") || input.includes("ask")) {
+      return "I'd be happy to answer your question. What would you like to know?"
+    } else if (input.includes("problem") || input.includes("issue")) {
+      return "I understand you're facing a challenge. Let me see how I can help you solve this."
+    } else if (input.includes("work") || input.includes("job")) {
+      return "I can definitely help with work-related topics. What specifically are you working on?"
+    } else if (input.includes("learn") || input.includes("teach")) {
+      return "I love helping people learn! What subject or skill are you interested in?"
+    } else {
+      // Return a contextual response that acknowledges their input
+      return aiResponses[Math.floor(Math.random() * aiResponses.length)]
+    }
+  }
+
   useEffect(() => {
-    // Create audio element
+    // Initialize speech recognition
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition()
+
+      recognitionRef.current.continuous = false
+      recognitionRef.current.interimResults = true
+      recognitionRef.current.lang = "en-US"
+
+      recognitionRef.current.onstart = () => {
+        setIsListening(true)
+        setUserTranscript("")
+      }
+
+      recognitionRef.current.onresult = (event) => {
+        let transcript = ""
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript
+        }
+        setUserTranscript(transcript)
+      }
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false)
+        if (userTranscript.trim()) {
+          setLastUserInput(userTranscript)
+          handleUserSpeechComplete(userTranscript)
+        }
+      }
+
+      recognitionRef.current.onerror = (event) => {
+        console.error("Speech recognition error:", event.error)
+        setIsListening(false)
+        setIsProcessing(false)
+      }
+    }
+
+    // Initialize audio element
     audioRef.current = new Audio()
 
-    // Set up event listeners
     audioRef.current.onplay = () => {
       setIsSpeaking(true)
-      setIsLoading(false)
+      setIsProcessing(false)
     }
 
     audioRef.current.onended = () => {
@@ -47,39 +113,44 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     audioRef.current.onerror = (error) => {
       console.error("Audio playback error:", error)
       setIsSpeaking(false)
-      setIsLoading(false)
-      // Fallback to browser speech synthesis
+      setIsProcessing(false)
       fallbackToSpeechSynthesis()
     }
 
-    audioRef.current.onloadstart = () => {
-      console.log("Audio loading started...")
-    }
-
-    audioRef.current.oncanplay = () => {
-      console.log("Audio can start playing")
-    }
-
     return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop()
+      }
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current = null
       }
     }
-  }, [])
+  }, [userTranscript])
 
-  const fallbackToSpeechSynthesis = () => {
-    const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)]
+  const handleUserSpeechComplete = async (transcript: string) => {
+    if (!transcript.trim()) return
+
+    setIsProcessing(true)
+
+    // Small delay to show processing state
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    // Generate AI response
+    await speakAIResponse(transcript)
+  }
+
+  const fallbackToSpeechSynthesis = (text?: string) => {
+    const responseText = text || generateContextualResponse(lastUserInput)
 
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel()
 
-      const utterance = new SpeechSynthesisUtterance(randomResponse)
+      const utterance = new SpeechSynthesisUtterance(responseText)
       utterance.rate = 0.9
       utterance.pitch = 1.0
       utterance.volume = 0.8
 
-      // Try to use a higher quality voice if available
       const voices = window.speechSynthesis.getVoices()
       const preferredVoice = voices.find(
         (voice) =>
@@ -94,7 +165,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
       utterance.onstart = () => {
         setIsSpeaking(true)
-        setIsLoading(false)
+        setIsProcessing(false)
       }
 
       utterance.onend = () => {
@@ -103,44 +174,36 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
       utterance.onerror = () => {
         setIsSpeaking(false)
-        setIsLoading(false)
+        setIsProcessing(false)
       }
 
       window.speechSynthesis.speak(utterance)
     }
   }
 
-  const speakWithOpenAI = async () => {
+  const speakAIResponse = async (userInput: string) => {
     if (!audioRef.current) return
 
-    setIsLoading(true)
-    setIsListening(false)
-
     try {
-      // Get a random response
-      const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)]
+      const responseText = generateContextualResponse(userInput)
 
-      console.log("Calling OpenAI TTS API...")
+      console.log("User said:", userInput)
+      console.log("AI responding:", responseText)
 
-      // Call our TTS API
       const response = await fetch("/api/tts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: randomResponse }),
+        body: JSON.stringify({ text: responseText }),
       })
 
       if (response.ok && response.headers.get("content-type")?.includes("audio")) {
-        // Create blob URL from audio data
         const audioBlob = await response.blob()
         const audioUrl = URL.createObjectURL(audioBlob)
 
-        console.log("Audio blob created, playing...")
-
         audioRef.current.src = audioUrl
 
-        // Clean up the blob URL after playing
         audioRef.current.onended = () => {
           setIsSpeaking(false)
           URL.revokeObjectURL(audioUrl)
@@ -148,14 +211,24 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
         await audioRef.current.play()
       } else {
-        // API returned an error, use fallback
         console.log("OpenAI TTS API error, using fallback")
-        fallbackToSpeechSynthesis()
+        fallbackToSpeechSynthesis(responseText)
       }
     } catch (error) {
-      console.error("Error with OpenAI TTS:", error)
-      // Fallback to browser speech synthesis
+      console.error("Error with AI response:", error)
       fallbackToSpeechSynthesis()
+    }
+  }
+
+  const startListening = () => {
+    if (recognitionRef.current && !isListening && !isSpeaking && !isProcessing) {
+      recognitionRef.current.start()
+    }
+  }
+
+  const stopListening = () => {
+    if (recognitionRef.current && isListening) {
+      recognitionRef.current.stop()
     }
   }
 
@@ -168,7 +241,17 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       window.speechSynthesis.cancel()
     }
     setIsSpeaking(false)
-    setIsLoading(false)
+    setIsProcessing(false)
+  }
+
+  const handleMicClick = () => {
+    if (isSpeaking) {
+      stopSpeaking()
+    } else if (isListening) {
+      stopListening()
+    } else if (!isProcessing) {
+      startListening()
+    }
   }
 
   return (
@@ -176,24 +259,40 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       {/* 3D Background */}
       <div className="absolute inset-0">
         {React.Children.map(children, (child) =>
-          React.isValidElement(child) ? React.cloneElement(child, { isSpeaking } as any) : child,
+          React.isValidElement(child)
+            ? React.cloneElement(child, { isSpeaking: isSpeaking || isListening } as any)
+            : child,
         )}
       </div>
 
-      {/* Mobile UI Overlay - No Phone Frame */}
+      {/* Mobile UI Overlay */}
       <div className="absolute inset-0 flex flex-col" style={{ fontFamily: '"Segoe UI", system-ui, sans-serif' }}>
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 z-10">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg">
-              {isLoading
-                ? "Generating voice..."
+              {isProcessing
+                ? "Processing..."
                 : isSpeaking
                   ? "Speaking..."
                   : isListening
-                    ? "I'm listening"
-                    : "How can I help?"}
+                    ? "I'm listening..."
+                    : "Tap mic to speak"}
             </h1>
+
+            {/* Show user transcript while listening */}
+            {isListening && userTranscript && (
+              <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
+                <p className="text-white text-sm">"{userTranscript}"</p>
+              </div>
+            )}
+
+            {/* Show last user input */}
+            {lastUserInput && !isListening && (
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
+                <p className="text-white/80 text-sm">You said: "{lastUserInput}"</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -204,7 +303,10 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               variant="ghost"
               size="icon"
               className="rounded-full w-12 h-12 hover:bg-white/20 text-white"
-              onClick={() => setIsListening(false)}
+              onClick={() => {
+                setLastUserInput("")
+                setUserTranscript("")
+              }}
             >
               <X className="w-6 h-6" />
             </Button>
@@ -213,7 +315,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               variant="ghost"
               size="icon"
               className={`rounded-full w-14 h-14 transition-colors ${
-                isLoading
+                isProcessing
                   ? "bg-purple-500 hover:bg-purple-600 text-white"
                   : isSpeaking
                     ? "bg-blue-500 hover:bg-blue-600 text-white"
@@ -221,16 +323,8 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                       ? "bg-red-500 hover:bg-red-600 text-white"
                       : "hover:bg-white/20 text-white"
               }`}
-              disabled={isLoading}
-              onClick={() => {
-                if (isSpeaking) {
-                  stopSpeaking()
-                } else if (isListening) {
-                  setIsListening(false)
-                } else {
-                  speakWithOpenAI()
-                }
-              }}
+              disabled={isProcessing}
+              onClick={handleMicClick}
             >
               <Mic className="w-7 h-7" />
             </Button>

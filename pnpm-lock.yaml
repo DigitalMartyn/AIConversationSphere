@@ -164,6 +164,9 @@ importers:
       sonner:
         specifier: ^1.7.1
         version: 1.7.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      speech-recognition:
+        specifier: latest
+        version: 0.0.1
       tailwind-merge:
         specifier: ^2.5.5
         version: 2.5.5
@@ -3838,6 +3841,9 @@ packages:
   source-map@0.6.1:
     resolution: {integrity: sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==}
     engines: {node: '>=0.10.0'}
+
+  speech-recognition@0.0.1:
+    resolution: {integrity: sha512-OIYftveS+jDg4T6rsRO4UIyrsD6At7jjyZF5vEoCkP0GjLTqputvspxAWCJ7o1okeFaU5/z4PcpQmHsO5OHrMg==}
 
   sprintf-js@1.0.3:
     resolution: {integrity: sha512-D9cPgkvLlV3t3IzL0D0YLvGA9Ahk4PcvVwUbN0dSGr1aP0Nrt4AEnTUbuGvquEC0mA64Gqt1fzirlRs5ibXx8g==}
@@ -8477,6 +8483,8 @@ snapshots:
   source-map@0.5.7: {}
 
   source-map@0.6.1: {}
+
+  speech-recognition@0.0.1: {}
 
   sprintf-js@1.0.3: {}
 
