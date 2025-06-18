@@ -1,26 +1,58 @@
 "use client"
 
 import React from "react"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { MessageCircle, X, Settings, Send } from "lucide-react"
+import { Mic, X, Settings, Send, MicOff, Info } from "lucide-react"
 
 interface MobileChatUIProps {
   children: React.ReactNode
 }
 
+// Define the SpeechRecognition type for TypeScript
+declare global {
+  interface Window {
+    SpeechRecognition: any
+    webkitSpeechRecognition: any
+  }
+}
+
 export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isListening, setIsListening] = useState(false)
   const [lastResponse, setLastResponse] = useState("")
   const [inputMessage, setInputMessage] = useState("")
   const [showTextInput, setShowTextInput] = useState(false)
+  const [speechRecognitionSupported, setSpeechRecognitionSupported] = useState(false)
+  const [currentTranscript, setCurrentTranscript] = useState("")
+  const [debugInfo, setDebugInfo] = useState<string[]>([])
+  const [showDebugInfo, setShowDebugInfo] = useState(false)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const recognitionRef = useRef<any>(null)
 
-  // Initialize audio element
-  React.useEffect(() => {
+  // Add debug message
+  const addDebugMessage = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString()
+    const debugMessage = `[${timestamp}] ${message}`
+    console.log(debugMessage)
+    setDebugInfo((prev) => [...prev.slice(-9), debugMessage]) // Keep last 10 messages
+  }
+
+  // Initialize audio element and speech recognition
+  useEffect(() => {
+    addDebugMessage("Starting initialization...")
+
+    // Log browser information
+    addDebugMessage(`Browser: ${navigator.userAgent}`)
+    addDebugMessage(`Language: ${navigator.language}`)
+    addDebugMessage(`Languages: ${navigator.languages?.join(", ") || "Not available"}`)
+    addDebugMessage(`Platform: ${navigator.platform}`)
+    addDebugMessage(`Online: ${navigator.onLine}`)
+
+    // Initialize audio element
     audioRef.current = new Audio()
 
     audioRef.current.onplay = () => {
@@ -43,7 +75,194 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       fallbackToSpeechSynthesis()
     }
 
+    // Initialize speech recognition with detailed debugging
+    if (typeof window !== "undefined") {
+      addDebugMessage("Checking for speech recognition support...")
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+
+      if (SpeechRecognition) {
+        addDebugMessage("SpeechRecognition API found!")
+
+        try {
+          recognitionRef.current = new SpeechRecognition()
+          addDebugMessage("SpeechRecognition instance created successfully")
+
+          // Log all available properties
+          const recognition = recognitionRef.current
+          addDebugMessage(`Recognition properties:`)
+          addDebugMessage(`- continuous: ${recognition.continuous}`)
+          addDebugMessage(`- interimResults: ${recognition.interimResults}`)
+          addDebugMessage(`- lang: ${recognition.lang || "not set"}`)
+          addDebugMessage(`- maxAlternatives: ${recognition.maxAlternatives || "not set"}`)
+          addDebugMessage(`- serviceURI: ${recognition.serviceURI || "not set"}`)
+
+          // Configure speech recognition
+          recognition.continuous = false
+          recognition.interimResults = true
+
+          // Try different language configurations
+          const testLanguages = [
+            "", // No language (browser default)
+            navigator.language,
+            "en-US",
+            "en",
+            "en-GB",
+          ]
+
+          addDebugMessage(`Testing languages: ${testLanguages.join(", ")}`)
+
+          // Test each language
+          for (const lang of testLanguages) {
+            try {
+              if (lang) {
+                recognition.lang = lang
+                addDebugMessage(`Set language to: ${lang}`)
+              } else {
+                addDebugMessage(`Using browser default language`)
+              }
+              break // If no error, use this language
+            } catch (langError) {
+              addDebugMessage(`Language ${lang} failed: ${langError}`)
+            }
+          }
+
+          recognition.onstart = () => {
+            addDebugMessage("Speech recognition started successfully")
+            setIsListening(true)
+            setCurrentTranscript("")
+          }
+
+          recognition.onresult = (event: any) => {
+            addDebugMessage(`Recognition result event: ${event.results.length} results`)
+
+            let transcript = ""
+            let isFinal = false
+
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              const result = event.results[i]
+              transcript += result[0].transcript
+              addDebugMessage(
+                `Result ${i}: "${result[0].transcript}" (confidence: ${result[0].confidence}, final: ${result.isFinal})`,
+              )
+
+              if (result.isFinal) {
+                isFinal = true
+              }
+            }
+
+            setCurrentTranscript(transcript)
+            addDebugMessage(`Full transcript: "${transcript}", Final: ${isFinal}`)
+
+            // If we have a final result, process it
+            if (isFinal && transcript.trim()) {
+              setInputMessage(transcript.trim())
+              setIsListening(false)
+              addDebugMessage(`Processing final transcript: "${transcript.trim()}"`)
+              // Auto-send the message after a short delay
+              setTimeout(() => {
+                sendMessage(transcript.trim())
+              }, 500)
+            }
+          }
+
+          recognition.onend = () => {
+            addDebugMessage("Speech recognition ended")
+            setIsListening(false)
+
+            // If we have a transcript but it wasn't final, still use it
+            if (currentTranscript.trim() && !inputMessage) {
+              addDebugMessage(`Using non-final transcript: "${currentTranscript.trim()}"`)
+              setInputMessage(currentTranscript.trim())
+              setTimeout(() => {
+                sendMessage(currentTranscript.trim())
+              }, 500)
+            }
+          }
+
+          recognition.onerror = (event: any) => {
+            const errorMsg = `Speech recognition error: ${event.error}`
+            addDebugMessage(errorMsg)
+            addDebugMessage(`Error details: ${JSON.stringify(event)}`)
+
+            setIsListening(false)
+
+            // Handle specific errors with detailed logging
+            switch (event.error) {
+              case "not-allowed":
+                addDebugMessage("Microphone permission denied")
+                break
+              case "no-speech":
+                addDebugMessage("No speech detected - this is normal")
+                break
+              case "language-not-supported":
+                addDebugMessage(`Language not supported. Current lang: ${recognition.lang}`)
+                addDebugMessage(`Browser language: ${navigator.language}`)
+                addDebugMessage(`Available languages: ${navigator.languages?.join(", ") || "Unknown"}`)
+                break
+              case "network":
+                addDebugMessage("Network error during speech recognition")
+                break
+              case "audio-capture":
+                addDebugMessage("Audio capture error - microphone issue")
+                break
+              case "aborted":
+                addDebugMessage("Speech recognition was aborted")
+                break
+              default:
+                addDebugMessage(`Unknown error: ${event.error}`)
+                break
+            }
+          }
+
+          recognition.onspeechstart = () => {
+            addDebugMessage("Speech detected - user started speaking")
+          }
+
+          recognition.onspeechend = () => {
+            addDebugMessage("Speech ended - user stopped speaking")
+          }
+
+          recognition.onsoundstart = () => {
+            addDebugMessage("Sound detected")
+          }
+
+          recognition.onsoundend = () => {
+            addDebugMessage("Sound ended")
+          }
+
+          recognition.onaudiostart = () => {
+            addDebugMessage("Audio capture started")
+          }
+
+          recognition.onaudioend = () => {
+            addDebugMessage("Audio capture ended")
+          }
+
+          recognition.onnomatch = () => {
+            addDebugMessage("No speech match found")
+          }
+
+          setSpeechRecognitionSupported(true)
+          addDebugMessage("Speech recognition initialized successfully")
+        } catch (error) {
+          addDebugMessage(`Error initializing speech recognition: ${error}`)
+          setSpeechRecognitionSupported(false)
+        }
+      } else {
+        addDebugMessage("Speech recognition not supported in this browser")
+        setSpeechRecognitionSupported(false)
+      }
+    }
+
     return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {
+          addDebugMessage(`Error stopping recognition: ${e}`)
+        }
+      }
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current = null
@@ -86,10 +305,9 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     if (isProcessing || isSpeaking || !message.trim()) return
 
     setIsProcessing(true)
+    addDebugMessage(`Sending message: "${message}"`)
 
     try {
-      console.log("Sending message to OpenAI:", message)
-
       // Send message to OpenAI
       const chatResponse = await fetch("/api/chat", {
         method: "POST",
@@ -104,7 +322,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       const chatData = await chatResponse.json()
       const aiResponse = chatData.response
 
-      console.log("AI Response:", aiResponse)
+      addDebugMessage(`AI Response received: "${aiResponse}"`)
       setLastResponse(aiResponse)
 
       // Convert response to speech
@@ -131,28 +349,52 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           await audioRef.current.play()
         }
       } else {
-        console.log("TTS failed, using browser speech synthesis")
+        addDebugMessage("TTS failed, using browser speech synthesis")
         fallbackToSpeechSynthesis(aiResponse)
       }
     } catch (error) {
-      console.error("Error:", error)
+      addDebugMessage(`Error: ${error}`)
       const fallbackText = "Sorry, I encountered an error while processing your message. Please try again."
       setLastResponse(fallbackText)
       fallbackToSpeechSynthesis(fallbackText)
     }
   }
 
-  const sendTestMessage = async () => {
-    const testMessages = [
-      "Hello! Please introduce yourself and tell me what you can help me with.",
-      "What's the weather like today?",
-      "Tell me a fun fact about space.",
-      "How can you help me be more productive?",
-      "What's your favorite programming language and why?",
-    ]
+  const startListening = () => {
+    addDebugMessage("Attempting to start listening...")
 
-    const randomMessage = testMessages[Math.floor(Math.random() * testMessages.length)]
-    await sendMessage(randomMessage)
+    if (!speechRecognitionSupported) {
+      addDebugMessage("Speech recognition not supported")
+      alert("Speech recognition is not supported in your browser. Please use the text input instead.")
+      return
+    }
+
+    if (recognitionRef.current && !isListening && !isSpeaking && !isProcessing) {
+      try {
+        setCurrentTranscript("")
+        setInputMessage("")
+        addDebugMessage("Starting speech recognition...")
+        recognitionRef.current.start()
+      } catch (error) {
+        addDebugMessage(`Error starting speech recognition: ${error}`)
+        alert("Could not start speech recognition. Please try again.")
+      }
+    } else {
+      addDebugMessage(
+        `Cannot start listening - isListening: ${isListening}, isSpeaking: ${isSpeaking}, isProcessing: ${isProcessing}`,
+      )
+    }
+  }
+
+  const stopListening = () => {
+    addDebugMessage("Stopping speech recognition...")
+    if (recognitionRef.current && isListening) {
+      try {
+        recognitionRef.current.stop()
+      } catch (error) {
+        addDebugMessage(`Error stopping speech recognition: ${error}`)
+      }
+    }
   }
 
   const handleTextSubmit = async (e: React.FormEvent) => {
@@ -176,11 +418,13 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     setIsProcessing(false)
   }
 
-  const handleChatClick = () => {
+  const handleMicClick = () => {
     if (isSpeaking) {
       stopSpeaking()
+    } else if (isListening) {
+      stopListening()
     } else {
-      sendTestMessage()
+      startListening()
     }
   }
 
@@ -198,8 +442,10 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   const clearAll = () => {
     setLastResponse("")
     setInputMessage("")
+    setCurrentTranscript("")
     setShowTextInput(false)
     stopSpeaking()
+    stopListening()
   }
 
   return (
@@ -207,21 +453,60 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       {/* 3D Background */}
       <div className="absolute inset-0">
         {React.Children.map(children, (child) =>
-          React.isValidElement(child) ? React.cloneElement(child, { isSpeaking: isSpeaking } as any) : child,
+          React.isValidElement(child)
+            ? React.cloneElement(child, { isSpeaking: isSpeaking || isListening } as any)
+            : child,
         )}
       </div>
 
       {/* Mobile UI Overlay */}
       <div className="absolute inset-0 flex flex-col" style={{ fontFamily: '"Segoe UI", system-ui, sans-serif' }}>
+        {/* Debug Info Panel */}
+        {showDebugInfo && (
+          <div className="absolute top-4 left-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg p-4 z-20 max-h-64 overflow-y-auto">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-white font-semibold">Debug Info</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDebugInfo(false)}
+                className="text-white hover:bg-white/20"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-1">
+              {debugInfo.map((info, index) => (
+                <p key={index} className="text-xs text-green-400 font-mono">
+                  {info}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 z-10">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg">
-              {isProcessing ? "Asking AI..." : isSpeaking ? "AI Speaking..." : "Chat with AI"}
+              {isProcessing
+                ? "Processing..."
+                : isSpeaking
+                  ? "AI Speaking..."
+                  : isListening
+                    ? "Listening..."
+                    : "Speak or Type to Chat"}
             </h1>
 
+            {/* Show current transcript while listening */}
+            {isListening && (
+              <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
+                <p className="text-white text-sm">{currentTranscript || "Listening..."}</p>
+              </div>
+            )}
+
             {/* Show last user input */}
-            {inputMessage && (
+            {inputMessage && !isListening && (
               <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
                 <p className="text-white/90 text-sm">You: "{inputMessage}"</p>
               </div>
@@ -258,12 +543,10 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               </div>
             )}
 
-            {/* Instructions */}
-            {!lastResponse && !showTextInput && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
-                <p className="text-white/70 text-sm">
-                  Tap the chat button for a random AI conversation, or use the settings button to type your own message.
-                </p>
+            {/* Speech recognition status */}
+            {!speechRecognitionSupported && (
+              <div className="bg-yellow-500/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
+                <p className="text-white text-sm">Speech recognition not available. Use text input instead.</p>
               </div>
             )}
           </div>
@@ -289,12 +572,16 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                   ? "bg-purple-500 hover:bg-purple-600 text-white"
                   : isSpeaking
                     ? "bg-blue-500 hover:bg-blue-600 text-white"
-                    : "hover:bg-white/20 text-white"
+                    : isListening
+                      ? "bg-red-500 hover:bg-red-600 text-white"
+                      : speechRecognitionSupported
+                        ? "hover:bg-white/20 text-white"
+                        : "bg-gray-500 text-gray-300"
               }`}
-              disabled={isProcessing}
-              onClick={handleChatClick}
+              disabled={isProcessing || !speechRecognitionSupported}
+              onClick={handleMicClick}
             >
-              <MessageCircle className="w-7 h-7" />
+              {isListening ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
             </Button>
 
             <Button
@@ -307,6 +594,16 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
             </Button>
           </div>
         </div>
+
+        {/* Debug Toggle Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-4 right-4 rounded-full w-10 h-10 hover:bg-white/20 text-white z-10"
+          onClick={() => setShowDebugInfo(!showDebugInfo)}
+        >
+          <Info className="w-5 h-5" />
+        </Button>
       </div>
     </div>
   )
