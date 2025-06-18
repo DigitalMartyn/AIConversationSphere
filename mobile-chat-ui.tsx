@@ -4,10 +4,17 @@ import React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, X, Settings } from "lucide-react"
-import SpeechRecognition from "speech-recognition"
 
 interface MobileChatUIProps {
   children: React.ReactNode
+}
+
+// Define the SpeechRecognition type for TypeScript
+declare global {
+  interface Window {
+    SpeechRecognition: any
+    webkitSpeechRecognition: any
+  }
 }
 
 export default function MobileChatUI({ children }: MobileChatUIProps) {
@@ -18,7 +25,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [lastUserInput, setLastUserInput] = useState("")
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const recognitionRef = useRef<any>(null)
 
   const aiResponses = [
     "That's interesting! Tell me more about that.",
@@ -58,42 +65,6 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   }
 
   useEffect(() => {
-    // Initialize speech recognition
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition()
-
-      recognitionRef.current.continuous = false
-      recognitionRef.current.interimResults = true
-      recognitionRef.current.lang = "en-US"
-
-      recognitionRef.current.onstart = () => {
-        setIsListening(true)
-        setUserTranscript("")
-      }
-
-      recognitionRef.current.onresult = (event) => {
-        let transcript = ""
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript
-        }
-        setUserTranscript(transcript)
-      }
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false)
-        if (userTranscript.trim()) {
-          setLastUserInput(userTranscript)
-          handleUserSpeechComplete(userTranscript)
-        }
-      }
-
-      recognitionRef.current.onerror = (event) => {
-        console.error("Speech recognition error:", event.error)
-        setIsListening(false)
-        setIsProcessing(false)
-      }
-    }
-
     // Initialize audio element
     audioRef.current = new Audio()
 
@@ -117,17 +88,65 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       fallbackToSpeechSynthesis()
     }
 
+    // Initialize speech recognition
+    if (typeof window !== "undefined") {
+      // Use the appropriate SpeechRecognition constructor
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition()
+
+        recognitionRef.current.continuous = false
+        recognitionRef.current.interimResults = true
+        recognitionRef.current.lang = "en-US"
+
+        recognitionRef.current.onstart = () => {
+          setIsListening(true)
+          setUserTranscript("")
+        }
+
+        recognitionRef.current.onresult = (event: any) => {
+          let transcript = ""
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript
+          }
+          setUserTranscript(transcript)
+        }
+
+        recognitionRef.current.onend = () => {
+          setIsListening(false)
+          if (userTranscript.trim()) {
+            setLastUserInput(userTranscript)
+            handleUserSpeechComplete(userTranscript)
+          }
+        }
+
+        recognitionRef.current.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error)
+          setIsListening(false)
+          setIsProcessing(false)
+        }
+      } else {
+        console.warn("Speech recognition not supported in this browser")
+      }
+    }
+
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.stop()
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {
+          // Ignore errors when stopping
+        }
       }
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current = null
       }
     }
-  }, [userTranscript])
+  }, [])
 
+  // Handle when user finishes speaking
   const handleUserSpeechComplete = async (transcript: string) => {
     if (!transcript.trim()) return
 
@@ -222,13 +241,21 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
   const startListening = () => {
     if (recognitionRef.current && !isListening && !isSpeaking && !isProcessing) {
-      recognitionRef.current.start()
+      try {
+        recognitionRef.current.start()
+      } catch (e) {
+        console.error("Error starting speech recognition:", e)
+      }
     }
   }
 
   const stopListening = () => {
     if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop()
+      try {
+        recognitionRef.current.stop()
+      } catch (e) {
+        console.error("Error stopping speech recognition:", e)
+      }
     }
   }
 
@@ -253,6 +280,13 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       startListening()
     }
   }
+
+  // Update transcript when it changes
+  useEffect(() => {
+    if (isListening && userTranscript) {
+      console.log("Current transcript:", userTranscript)
+    }
+  }, [userTranscript, isListening])
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
