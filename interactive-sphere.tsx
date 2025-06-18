@@ -25,7 +25,7 @@ export default function Component() {
         <GradientSphere />
         <FloatingParticles />
 
-        <ContactShadows position={[0, -2.5, 0]} opacity={0.4} scale={8} blur={2.5} far={2.5} />
+        <ContactShadows position={[0, -2.5, 0]} opacity={0.15} scale={3} blur={1.5} far={1.5} resolution={256} />
 
         <OrbitControls
           enablePan={false}
