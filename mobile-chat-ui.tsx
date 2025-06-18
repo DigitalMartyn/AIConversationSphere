@@ -295,7 +295,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   }
 
   const startListening = async () => {
-    addDebugMessage("Attempting to start listening...")
+    addDebugMessage("=== TRYING PUSH-TO-TALK APPROACH ===")
 
     if (!speechRecognitionSupported) {
       addDebugMessage("Speech recognition not supported")
@@ -312,143 +312,87 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
 
     if (recognitionRef.current && !isListening && !isSpeaking && !isProcessing) {
-      // Get available languages from TTS voices
-      const availableLanguages = getAvailableLanguages()
+      try {
+        addDebugMessage("=== Creating recognition with ZERO configuration ===")
 
-      // Create a comprehensive test list using available languages
-      const testLanguages = [
-        // Browser languages first
-        ...navigator.languages,
-        // Available TTS languages (these are most likely to work)
-        ...availableLanguages,
-        // Common fallbacks
-        "en-US",
-        "en-GB",
-        "en-AU",
-        "en-CA",
-        "en",
-        // Try without setting language
-        null,
-      ]
+        // Create the most basic possible recognition instance
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+        const recognition = new SpeechRecognition()
 
-      // Remove duplicates
-      const uniqueLanguages = [...new Set(testLanguages.filter((lang) => lang !== null))]
-      addDebugMessage(`Testing ${uniqueLanguages.length + 1} languages: ${uniqueLanguages.join(", ")}, plus default`)
+        // Don't set ANY properties - use whatever the browser gives us
+        addDebugMessage("Using completely default recognition settings")
+        addDebugMessage(`Default lang: ${recognition.lang || "undefined"}`)
 
-      for (let i = 0; i < testLanguages.length; i++) {
-        const lang = testLanguages[i]
+        let hasResult = false
 
-        try {
-          addDebugMessage(`=== Test ${i + 1}/${testLanguages.length}: ${lang || "default"} ===`)
-
-          // Create a fresh recognition instance
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-          const newRecognition = new SpeechRecognition()
-
-          // Use basic settings
-          newRecognition.continuous = false
-          newRecognition.interimResults = true
-
-          // Set language if specified
-          if (lang) {
-            newRecognition.lang = lang
-            addDebugMessage(`Set language to: ${lang}`)
-          } else {
-            addDebugMessage(`Using browser default language`)
-          }
-
-          // Create promise for async handling
-          const recognitionPromise = new Promise((resolve, reject) => {
-            let started = false
-            let errored = false
-
-            newRecognition.onstart = () => {
-              addDebugMessage(`✅ SUCCESS: Started with ${lang || "default"}`)
-              setIsListening(true)
-              setCurrentTranscript("")
-              started = true
-              resolve(true)
-            }
-
-            newRecognition.onerror = (event: any) => {
-              addDebugMessage(`❌ ERROR: ${lang || "default"} failed: ${event.error}`)
-              errored = true
-
-              if (event.error === "language-not-supported") {
-                reject(new Error("language-not-supported"))
-              } else if (event.error === "not-allowed") {
-                setSpeechRecognitionSupported(false)
-                reject(new Error("not-allowed"))
-              } else {
-                reject(new Error(event.error))
-              }
-            }
-
-            newRecognition.onresult = (event: any) => {
-              let transcript = ""
-              for (let i = 0; i < event.results.length; i++) {
-                transcript += event.results[i][0].transcript
-              }
-              setCurrentTranscript(transcript)
-              addDebugMessage(`Transcript: "${transcript}"`)
-
-              if (transcript.trim()) {
-                setInputMessage(transcript.trim())
-              }
-            }
-
-            newRecognition.onend = () => {
-              addDebugMessage("Recognition ended")
-              setIsListening(false)
-
-              if (currentTranscript.trim() || inputMessage.trim()) {
-                const finalText = currentTranscript.trim() || inputMessage.trim()
-                addDebugMessage(`Processing: "${finalText}"`)
-                setTimeout(() => sendMessage(finalText), 500)
-              }
-            }
-
-            // Timeout
-            setTimeout(() => {
-              if (!started && !errored) {
-                addDebugMessage(`Timeout for ${lang || "default"}`)
-                reject(new Error("timeout"))
-              }
-            }, 3000)
-          })
-
-          // Replace recognition instance
-          recognitionRef.current = newRecognition
+        recognition.onstart = () => {
+          addDebugMessage("✅ Recognition started successfully!")
+          setIsListening(true)
           setCurrentTranscript("")
-          setInputMessage("")
+        }
 
-          // Start recognition
-          addDebugMessage(`Starting recognition...`)
-          newRecognition.start()
+        recognition.onresult = (event) => {
+          addDebugMessage(`Got result! ${event.results.length} results`)
+          hasResult = true
 
-          // Wait for result
-          await recognitionPromise
-
-          // If we get here, it worked!
-          addDebugMessage(`🎉 Speech recognition working with: ${lang || "default"}`)
-          return
-        } catch (error) {
-          addDebugMessage(`${lang || "default"} failed: ${error.message}`)
-
-          if (error.message === "not-allowed") {
-            alert("Microphone permission required")
-            return
+          let transcript = ""
+          for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript
+            addDebugMessage(`Result ${i}: "${event.results[i][0].transcript}"`)
           }
 
-          // Continue to next language
-          continue
+          setCurrentTranscript(transcript)
+          if (transcript.trim()) {
+            setInputMessage(transcript.trim())
+            addDebugMessage(`Final transcript: "${transcript.trim()}"`)
+          }
         }
-      }
 
-      // If we get here, nothing worked
-      addDebugMessage("❌ No working language found")
-      setSpeechRecognitionSupported(false)
-      alert("Speech recognition is not working. Please use text input instead.")
+        recognition.onend = () => {
+          addDebugMessage("Recognition ended")
+          setIsListening(false)
+
+          if (hasResult && (currentTranscript.trim() || inputMessage.trim())) {
+            const finalText = currentTranscript.trim() || inputMessage.trim()
+            addDebugMessage(`Processing: "${finalText}"`)
+            setTimeout(() => sendMessage(finalText), 500)
+          } else {
+            addDebugMessage("No results to process")
+          }
+        }
+
+        recognition.onerror = (event) => {
+          addDebugMessage(`ERROR: ${event.error}`)
+          addDebugMessage(`Error details: ${JSON.stringify(event)}`)
+          setIsListening(false)
+
+          // Show user-friendly error
+          if (event.error === "not-allowed") {
+            alert("Microphone permission is required. Please allow access and try again.")
+          } else if (event.error === "no-speech") {
+            alert("No speech detected. Please try speaking again.")
+          } else if (event.error === "audio-capture") {
+            alert("Microphone not working. Please check your microphone and try again.")
+          } else if (event.error === "network") {
+            alert("Network error. Please check your internet connection.")
+          } else {
+            alert(`Speech recognition error: ${event.error}. Please try the text input instead.`)
+          }
+        }
+
+        // Store the recognition instance
+        recognitionRef.current = recognition
+        setCurrentTranscript("")
+        setInputMessage("")
+
+        // Start recognition with no configuration at all
+        addDebugMessage("🚀 Starting recognition with zero config...")
+        recognition.start()
+      } catch (error) {
+        addDebugMessage(`Failed to create recognition: ${error}`)
+        alert("Speech recognition failed to start. Please use text input instead.")
+        setSpeechRecognitionSupported(false)
+      }
     }
   }
 
@@ -563,6 +507,12 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                     ? "Listening..."
                     : "Speak or Type to Chat"}
             </h1>
+
+            {speechRecognitionSupported && (
+              <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
+                <p className="text-white text-sm">🎤 Click microphone, speak clearly, then wait for processing</p>
+              </div>
+            )}
 
             {/* Show current transcript while listening */}
             {isListening && (
