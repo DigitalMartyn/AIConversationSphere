@@ -11,7 +11,7 @@ interface MobileChatUIProps {
 }
 
 export default function MobileChatUI({ children }: MobileChatUIProps) {
-  const [isListening, setIsListening] = useState(true)
+  const [isListening, setIsListening] = useState(false)
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
@@ -19,7 +19,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       <div className="absolute inset-0">{children}</div>
 
       {/* Mobile UI Overlay - No Phone Frame */}
-      <div className="absolute inset-0 flex flex-col">
+      <div className="absolute inset-0 flex flex-col" style={{ fontFamily: '"Segoe UI", system-ui, sans-serif' }}>
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 z-10">
           <div className="text-center mb-8">
