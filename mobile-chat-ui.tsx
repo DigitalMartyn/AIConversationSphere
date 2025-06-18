@@ -194,6 +194,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
             switch (event.error) {
               case "not-allowed":
                 addDebugMessage("Microphone permission denied")
+                setSpeechRecognitionSupported(false)
                 break
               case "no-speech":
                 addDebugMessage("No speech detected - this is normal")
@@ -202,12 +203,41 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                 addDebugMessage(`Language not supported. Current lang: ${recognition.lang}`)
                 addDebugMessage(`Browser language: ${navigator.language}`)
                 addDebugMessage(`Available languages: ${navigator.languages?.join(", ") || "Unknown"}`)
+
+                // Try to automatically retry with a different language
+                const currentLang = recognition.lang
+                const fallbackLanguages = ["en-US", "en-GB", "en", ""]
+                const currentIndex = fallbackLanguages.indexOf(currentLang)
+
+                if (currentIndex < fallbackLanguages.length - 1) {
+                  const nextLang = fallbackLanguages[currentIndex + 1]
+                  addDebugMessage(`Automatically trying next language: ${nextLang || "default"}`)
+
+                  setTimeout(() => {
+                    if (nextLang) {
+                      recognition.lang = nextLang
+                    } else {
+                      recognition.lang = undefined
+                    }
+
+                    try {
+                      recognition.start()
+                    } catch (retryError) {
+                      addDebugMessage(`Retry failed: ${retryError}`)
+                      setSpeechRecognitionSupported(false)
+                    }
+                  }, 100)
+                } else {
+                  addDebugMessage("All language options exhausted")
+                  setSpeechRecognitionSupported(false)
+                }
                 break
               case "network":
                 addDebugMessage("Network error during speech recognition")
                 break
               case "audio-capture":
                 addDebugMessage("Audio capture error - microphone issue")
+                setSpeechRecognitionSupported(false)
                 break
               case "aborted":
                 addDebugMessage("Speech recognition was aborted")
@@ -363,7 +393,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }
 
-  const startListening = () => {
+  const startListening = async () => {
     addDebugMessage("Attempting to start listening...")
 
     if (!speechRecognitionSupported) {
@@ -373,14 +403,33 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
 
     if (recognitionRef.current && !isListening && !isSpeaking && !isProcessing) {
-      try {
-        setCurrentTranscript("")
-        setInputMessage("")
-        addDebugMessage("Starting speech recognition...")
-        recognitionRef.current.start()
-      } catch (error) {
-        addDebugMessage(`Error starting speech recognition: ${error}`)
-        alert("Could not start speech recognition. Please try again.")
+      // Test languages in order of preference
+      const testLanguages = ["en-US", "en-GB", "en", ""]
+
+      for (const lang of testLanguages) {
+        try {
+          setCurrentTranscript("")
+          setInputMessage("")
+
+          // Set the language for this attempt
+          if (lang) {
+            recognitionRef.current.lang = lang
+            addDebugMessage(`Trying language: ${lang}`)
+          } else {
+            recognitionRef.current.lang = undefined
+            addDebugMessage(`Trying with no language set (browser default)`)
+          }
+
+          addDebugMessage(`Language property is now: ${recognitionRef.current.lang || "undefined"}`)
+
+          // Try to start recognition
+          recognitionRef.current.start()
+          addDebugMessage(`Successfully started with language: ${lang || "default"}`)
+          break // If we get here, it worked!
+        } catch (error) {
+          addDebugMessage(`Language ${lang || "default"} failed immediately: ${error}`)
+          continue // Try next language
+        }
       }
     } else {
       addDebugMessage(
