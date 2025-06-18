@@ -101,31 +101,34 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           recognition.continuous = false
           recognition.interimResults = true
 
-          // Try different language configurations
-          const testLanguages = [
-            "", // No language (browser default)
-            navigator.language,
-            "en-US",
-            "en",
-            "en-GB",
-          ]
+          // Set language directly - use the first supported language
+          const supportedLanguages = ["en", "en-GB", "en-US"]
+          const browserLanguages = navigator.languages || [navigator.language || "en"]
+          addDebugMessage(`Browser languages: ${browserLanguages.join(", ")}`)
+          addDebugMessage(`Supported languages: ${supportedLanguages.join(", ")}`)
 
-          addDebugMessage(`Testing languages: ${testLanguages.join(", ")}`)
+          // Find the first matching language
+          let selectedLanguage = "en" // Default fallback
 
-          // Test each language
-          for (const lang of testLanguages) {
-            try {
-              if (lang) {
-                recognition.lang = lang
-                addDebugMessage(`Set language to: ${lang}`)
-              } else {
-                addDebugMessage(`Using browser default language`)
-              }
-              break // If no error, use this language
-            } catch (langError) {
-              addDebugMessage(`Language ${lang} failed: ${langError}`)
+          for (const browserLang of browserLanguages) {
+            // Check exact match first
+            if (supportedLanguages.includes(browserLang)) {
+              selectedLanguage = browserLang
+              break
+            }
+            // Check language code match (e.g., 'en' from 'en-US')
+            const langCode = browserLang.split("-")[0]
+            const match = supportedLanguages.find((lang) => lang.startsWith(langCode))
+            if (match) {
+              selectedLanguage = match
+              break
             }
           }
+
+          // Set the language explicitly
+          recognition.lang = selectedLanguage
+          addDebugMessage(`Setting language to: ${selectedLanguage}`)
+          addDebugMessage(`Language set successfully: ${recognition.lang}`)
 
           recognition.onstart = () => {
             addDebugMessage("Speech recognition started successfully")
