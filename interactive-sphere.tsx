@@ -42,14 +42,12 @@ export default function Component() {
 }
 
 function FloatingParticles() {
-  const particlesRef = useRef()
   const particleCount = 150
 
   // Create particle positions and properties
   const particleData = useMemo(() => {
     const positions = new Float32Array(particleCount * 3)
     const colors = new Float32Array(particleCount * 3)
-    const originalPositions = new Float32Array(particleCount * 3)
 
     const gradientColors = [
       [1.0, 0.08, 0.58], // Deep pink
@@ -72,11 +70,6 @@ function FloatingParticles() {
       positions[i * 3 + 1] = y
       positions[i * 3 + 2] = z
 
-      // Store original positions for animation reference
-      originalPositions[i * 3] = x
-      originalPositions[i * 3 + 1] = y
-      originalPositions[i * 3 + 2] = z
-
       // Assign random gradient colors
       const colorIndex = Math.floor(Math.random() * gradientColors.length)
       const color = gradientColors[colorIndex]
@@ -85,41 +78,8 @@ function FloatingParticles() {
       colors[i * 3 + 2] = color[2]
     }
 
-    return { positions, colors, originalPositions }
+    return { positions, colors }
   }, [])
-
-  useFrame((state) => {
-    if (particlesRef.current && particlesRef.current.geometry && particlesRef.current.geometry.attributes.position) {
-      const positions = particlesRef.current.geometry.attributes.position.array
-      const time = state.clock.elapsedTime
-
-      // Animate each particle
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3
-
-        // Get original position
-        const origX = particleData.originalPositions[i3]
-        const origY = particleData.originalPositions[i3 + 1]
-        const origZ = particleData.originalPositions[i3 + 2]
-
-        // Add floating motion
-        positions[i3] = origX + Math.sin(time * 0.1 + i * 0.1) * 0.1
-        positions[i3 + 1] = origY + Math.cos(time * 0.06 + i * 0.15) * 0.15
-        positions[i3 + 2] = origZ + Math.sin(time * 0.08 + i * 0.2) * 0.1
-
-        // Add orbital motion around the sphere
-        const orbitSpeed = 0.004
-        const orbitRadius = Math.sqrt(origX * origX + origZ * origZ)
-        const currentAngle = Math.atan2(origZ, origX)
-        const newAngle = currentAngle + time * orbitSpeed
-
-        positions[i3] = orbitRadius * Math.cos(newAngle) + Math.sin(time * 0.1 + i * 0.1) * 0.1
-        positions[i3 + 2] = orbitRadius * Math.sin(newAngle) + Math.sin(time * 0.08 + i * 0.2) * 0.1
-      }
-
-      particlesRef.current.geometry.attributes.position.needsUpdate = true
-    }
-  })
 
   // Create circular texture for round particles
   const circleTexture = useMemo(() => {
@@ -140,7 +100,7 @@ function FloatingParticles() {
   }, [])
 
   return (
-    <points ref={particlesRef}>
+    <points>
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
