@@ -21,6 +21,9 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     "Feel free to ask me anything - I'm ready to help!",
     "I can help you with information, creative tasks, and problem-solving.",
     "What would you like to know or explore together?",
+    "I'm powered by advanced AI technology and I'm here to make your day better.",
+    "Whether you need help with work, creativity, or just want to chat, I'm here for you.",
+    "I can assist with writing, analysis, problem-solving, and much more. What interests you?",
   ]
 
   useEffect(() => {
@@ -28,12 +31,33 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     audioRef.current = new Audio()
 
     // Set up event listeners
-    audioRef.current.onplay = () => setIsSpeaking(true)
-    audioRef.current.onended = () => setIsSpeaking(false)
-    audioRef.current.onpause = () => setIsSpeaking(false)
-    audioRef.current.onerror = () => {
+    audioRef.current.onplay = () => {
+      setIsSpeaking(true)
+      setIsLoading(false)
+    }
+
+    audioRef.current.onended = () => {
+      setIsSpeaking(false)
+    }
+
+    audioRef.current.onpause = () => {
+      setIsSpeaking(false)
+    }
+
+    audioRef.current.onerror = (error) => {
+      console.error("Audio playback error:", error)
       setIsSpeaking(false)
       setIsLoading(false)
+      // Fallback to browser speech synthesis
+      fallbackToSpeechSynthesis()
+    }
+
+    audioRef.current.onloadstart = () => {
+      console.log("Audio loading started...")
+    }
+
+    audioRef.current.oncanplay = () => {
+      console.log("Audio can start playing")
     }
 
     return () => {
@@ -44,56 +68,51 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }, [])
 
-  const speakWithBrowserAPI = (text: string) => {
-    return new Promise<void>((resolve, reject) => {
-      if ("speechSynthesis" in window) {
-        // Stop any current speech
-        window.speechSynthesis.cancel()
+  const fallbackToSpeechSynthesis = () => {
+    const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)]
 
-        const utterance = new SpeechSynthesisUtterance(text)
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel()
 
-        // Configure for better quality
-        utterance.rate = 0.9
-        utterance.pitch = 1.0
-        utterance.volume = 0.8
+      const utterance = new SpeechSynthesisUtterance(randomResponse)
+      utterance.rate = 0.9
+      utterance.pitch = 1.0
+      utterance.volume = 0.8
 
-        // Try to use a higher quality voice if available
-        const voices = window.speechSynthesis.getVoices()
-        const preferredVoice = voices.find(
-          (voice) =>
-            voice.name.includes("Google") ||
-            voice.name.includes("Microsoft") ||
-            voice.name.includes("Alex") ||
-            voice.name.includes("Samantha"),
-        )
-        if (preferredVoice) {
-          utterance.voice = preferredVoice
-        }
-
-        utterance.onstart = () => {
-          setIsSpeaking(true)
-          setIsLoading(false)
-        }
-
-        utterance.onend = () => {
-          setIsSpeaking(false)
-          resolve()
-        }
-
-        utterance.onerror = (error) => {
-          setIsSpeaking(false)
-          setIsLoading(false)
-          reject(error)
-        }
-
-        window.speechSynthesis.speak(utterance)
-      } else {
-        reject(new Error("Speech synthesis not supported"))
+      // Try to use a higher quality voice if available
+      const voices = window.speechSynthesis.getVoices()
+      const preferredVoice = voices.find(
+        (voice) =>
+          voice.name.includes("Google") ||
+          voice.name.includes("Microsoft") ||
+          voice.name.includes("Alex") ||
+          voice.name.includes("Samantha"),
+      )
+      if (preferredVoice) {
+        utterance.voice = preferredVoice
       }
-    })
+
+      utterance.onstart = () => {
+        setIsSpeaking(true)
+        setIsLoading(false)
+      }
+
+      utterance.onend = () => {
+        setIsSpeaking(false)
+      }
+
+      utterance.onerror = () => {
+        setIsSpeaking(false)
+        setIsLoading(false)
+      }
+
+      window.speechSynthesis.speak(utterance)
+    }
   }
 
   const speakWithOpenAI = async () => {
+    if (!audioRef.current) return
+
     setIsLoading(true)
     setIsListening(false)
 
@@ -101,42 +120,49 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       // Get a random response
       const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)]
 
-      // Try OpenAI TTS API first (when implemented)
-      try {
-        const response = await fetch("/api/tts", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ text: randomResponse }),
-        })
+      console.log("Calling OpenAI TTS API...")
 
-        if (response.ok) {
-          const data = await response.json()
+      // Call our TTS API
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: randomResponse }),
+      })
 
-          if (data.url && audioRef.current) {
-            audioRef.current.src = data.url
-            await audioRef.current.play()
-            setIsLoading(false)
-            return
-          }
+      if (response.ok && response.headers.get("content-type")?.includes("audio")) {
+        // Create blob URL from audio data
+        const audioBlob = await response.blob()
+        const audioUrl = URL.createObjectURL(audioBlob)
+
+        console.log("Audio blob created, playing...")
+
+        audioRef.current.src = audioUrl
+
+        // Clean up the blob URL after playing
+        audioRef.current.onended = () => {
+          setIsSpeaking(false)
+          URL.revokeObjectURL(audioUrl)
         }
-      } catch (apiError) {
-        console.log("OpenAI TTS not available, using browser speech synthesis")
-      }
 
-      // Fallback to browser speech synthesis
-      await speakWithBrowserAPI(randomResponse)
+        await audioRef.current.play()
+      } else {
+        // API returned an error, use fallback
+        console.log("OpenAI TTS API error, using fallback")
+        fallbackToSpeechSynthesis()
+      }
     } catch (error) {
-      console.error("Error with speech:", error)
-      setIsLoading(false)
-      setIsSpeaking(false)
+      console.error("Error with OpenAI TTS:", error)
+      // Fallback to browser speech synthesis
+      fallbackToSpeechSynthesis()
     }
   }
 
   const stopSpeaking = () => {
     if (audioRef.current) {
       audioRef.current.pause()
+      audioRef.current.currentTime = 0
     }
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel()
@@ -161,7 +187,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           <div className="text-center mb-8">
             <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg">
               {isLoading
-                ? "Thinking..."
+                ? "Generating voice..."
                 : isSpeaking
                   ? "Speaking..."
                   : isListening
@@ -186,7 +212,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
             <Button
               variant="ghost"
               size="icon"
-              className={`rounded-full w-14 h-14 ${
+              className={`rounded-full w-14 h-14 transition-colors ${
                 isLoading
                   ? "bg-purple-500 hover:bg-purple-600 text-white"
                   : isSpeaking

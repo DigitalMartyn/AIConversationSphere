@@ -9,39 +9,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "OpenAI API key not configured" }, { status: 501 })
     }
 
-    // Real OpenAI TTS implementation would go here
-    // For now, return an error to trigger fallback
-    return NextResponse.json({ error: "TTS service temporarily unavailable" }, { status: 503 })
-
-    /* 
-    // Uncomment this when you have OpenAI API key configured:
-    
-    const response = await fetch('https://api.openai.com/v1/audio/speech', {
-      method: 'POST',
+    // Call OpenAI TTS API
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'tts-1',
-        voice: 'alloy',
+        model: "tts-1",
+        voice: "alloy", // You can change this to: alloy, echo, fable, onyx, nova, shimmer
         input: text,
+        response_format: "mp3",
+        speed: 1.0,
       }),
     })
 
     if (!response.ok) {
-      throw new Error('OpenAI TTS API error')
+      const errorText = await response.text()
+      console.error("OpenAI TTS API error:", errorText)
+      return NextResponse.json({ error: "OpenAI TTS API error" }, { status: response.status })
     }
 
     const audioBuffer = await response.arrayBuffer()
-    
+
     return new NextResponse(audioBuffer, {
       headers: {
-        'Content-Type': 'audio/mpeg',
-        'Content-Length': audioBuffer.byteLength.toString(),
+        "Content-Type": "audio/mpeg",
+        "Content-Length": audioBuffer.byteLength.toString(),
+        "Cache-Control": "public, max-age=3600", // Cache for 1 hour
       },
     })
-    */
   } catch (error) {
     console.error("TTS API error:", error)
     return NextResponse.json({ error: "Failed to generate speech" }, { status: 500 })
