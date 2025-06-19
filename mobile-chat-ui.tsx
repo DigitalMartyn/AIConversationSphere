@@ -391,9 +391,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                   ? "AI Speaking..."
                   : isRecording
                     ? "I'm listening"
-                    : inputMessage || lastResponse
-                      ? "I'm listening"
-                      : "How can I help you today?"}
+                    : "How can I help you today?"}
             </h1>
 
             {/* Recording Status - Removed */}
