@@ -173,7 +173,7 @@ function GradientSphere() {
       meshRef.current.position.y = baseY
 
       // Base scale and animation parameters
-      const baseScale = 1.125
+      const baseScale = 1.0
 
       if (isSpeaking) {
         // Dramatic pulsing when AI is speaking
