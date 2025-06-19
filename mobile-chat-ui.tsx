@@ -391,7 +391,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                   ? "AI Speaking..."
                   : isRecording
                     ? `Recording... ${formatTime(recordingTime)}`
-                    : "AI Chat Assistant"}
+                    : "I'm listening"}
             </h1>
 
             {/* Recording Status */}
