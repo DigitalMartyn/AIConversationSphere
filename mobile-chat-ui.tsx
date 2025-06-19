@@ -4,7 +4,7 @@ import React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Mic, X, Settings, Send, MicOff, Info } from "lucide-react"
+import { Mic, X, Keyboard, Send, MicOff, Info } from "lucide-react"
 
 interface MobileChatUIProps {
   children: React.ReactNode
@@ -16,7 +16,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [lastResponse, setLastResponse] = useState("")
   const [inputMessage, setInputMessage] = useState("")
-  const [showTextInput, setShowTextInput] = useState(true)
+  const [showTextInput, setShowTextInput] = useState(false)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
   const [showDebugInfo, setShowDebugInfo] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
@@ -480,7 +480,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               className={`rounded-round w-12 h-12 hover:bg-white/20 text-white ${showTextInput ? "bg-white/20" : ""}`}
               onClick={toggleTextInput}
             >
-              <Settings className="w-6 h-6" />
+              <Keyboard className="w-6 h-6" />
             </Button>
           </div>
         </div>
