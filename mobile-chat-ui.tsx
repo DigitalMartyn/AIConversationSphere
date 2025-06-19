@@ -384,7 +384,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 z-10">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg">
+            <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg tracking-wide">
               {isProcessing
                 ? "Processing..."
                 : isSpeaking
