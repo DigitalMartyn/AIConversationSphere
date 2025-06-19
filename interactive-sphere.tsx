@@ -9,28 +9,19 @@ interface ComponentProps {
   isSpeaking?: boolean
 }
 
-export default function Component({ isSpeaking = false }: ComponentProps) {
-  // Add debug logging at the top level
-  console.log("🟢 InteractiveSphere received isSpeaking:", isSpeaking)
+// Create a global state that can be accessed by the sphere
+let globalSpeakingState = false
 
-  // Add useEffect to track prop changes
+export default function Component({ isSpeaking = false }: ComponentProps) {
+  // Update global state whenever prop changes
   useEffect(() => {
     console.log("🟢 InteractiveSphere isSpeaking changed to:", isSpeaking)
+    globalSpeakingState = isSpeaking
   }, [isSpeaking])
 
   return (
     <div className="w-full h-screen" style={{ backgroundColor: "#c4b5fd" }}>
-      <Canvas
-        camera={{ position: [0, 0, 5], fov: 45 }}
-        shadows
-        gl={{
-          antialias: true,
-          alpha: false,
-          powerPreference: "high-performance",
-          preserveDrawingBuffer: false,
-        }}
-        dpr={[1, 2]} // Limit device pixel ratio to prevent excessive GPU usage
-      >
+      <Canvas camera={{ position: [0, 0, 5], fov: 45 }} shadows>
         <ambientLight intensity={0.6} color="#f5f0ff" />
         <directionalLight position={[5, 5, 5]} intensity={1.2} color="#ffffff" />
         <pointLight position={[-3, 2, 3]} intensity={0.5} color="#ff69b4" />
@@ -44,7 +35,7 @@ export default function Component({ isSpeaking = false }: ComponentProps) {
           </mesh>
         </Environment>
 
-        <GradientSphere isSpeaking={isSpeaking} />
+        <GradientSphere />
         <FloatingParticles />
 
         <ContactShadows position={[0, -2.5, 0]} opacity={0.15} scale={3} blur={1.5} far={1.5} resolution={256} />
@@ -64,7 +55,7 @@ export default function Component({ isSpeaking = false }: ComponentProps) {
 }
 
 function FloatingParticles() {
-  const particleCount = 100 // Reduced from 150 to improve performance
+  const particleCount = 150
 
   // Create particle positions and properties
   const particleData = useMemo(() => {
@@ -106,17 +97,17 @@ function FloatingParticles() {
   // Create circular texture for round particles
   const circleTexture = useMemo(() => {
     const canvas = document.createElement("canvas")
-    canvas.width = 32 // Reduced from 64 to improve performance
-    canvas.height = 32
+    canvas.width = 64
+    canvas.height = 64
     const context = canvas.getContext("2d")
 
-    const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16)
+    const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32)
     gradient.addColorStop(0, "rgba(255, 255, 255, 1)")
     gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.5)")
     gradient.addColorStop(1, "rgba(255, 255, 255, 0)")
 
     context.fillStyle = gradient
-    context.fillRect(0, 0, 32, 32)
+    context.fillRect(0, 0, 64, 64)
 
     return new CanvasTexture(canvas)
   }, [])
@@ -145,27 +136,18 @@ function FloatingParticles() {
   )
 }
 
-function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
+function GradientSphere() {
   const meshRef = useRef()
-  const lastSpeakingState = useRef(isSpeaking)
-
-  // Add debug logging and useEffect to track changes
-  console.log("🔴 GradientSphere isSpeaking:", isSpeaking)
-
-  useEffect(() => {
-    console.log("🔴 GradientSphere isSpeaking changed to:", isSpeaking)
-    lastSpeakingState.current = isSpeaking
-  }, [isSpeaking])
 
   // Create a simple horizontal gradient texture
   const gradientTexture = useMemo(() => {
     const canvas = document.createElement("canvas")
-    canvas.width = 256 // Reduced from 512 to improve performance
-    canvas.height = 256
+    canvas.width = 512
+    canvas.height = 512
     const context = canvas.getContext("2d")
 
     // Create seamless wrapping gradient
-    const gradient = context.createLinearGradient(0, 0, 256, 0)
+    const gradient = context.createLinearGradient(0, 0, 512, 0)
     gradient.addColorStop(0, "#FF1493") // Deep pink
     gradient.addColorStop(0.25, "#9932CC") // Dark orchid
     gradient.addColorStop(0.5, "#1E90FF") // Dodger blue
@@ -173,7 +155,7 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
     gradient.addColorStop(1, "#FF1493") // Deep pink (back to start)
 
     context.fillStyle = gradient
-    context.fillRect(0, 0, 256, 256)
+    context.fillRect(0, 0, 512, 512)
 
     // Enable texture wrapping for seamless animation
     const texture = new CanvasTexture(canvas)
@@ -182,6 +164,9 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
   }, [])
 
   useFrame((state) => {
+    // Access the global speaking state directly
+    const isSpeaking = globalSpeakingState
+
     if (meshRef.current) {
       // Base floating animation
       const baseY = Math.sin(state.clock.elapsedTime * 0.5) * 0.1
@@ -191,21 +176,20 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
       const baseScale = 1.125
 
       if (isSpeaking) {
-        // More dramatic pulsing when AI is speaking
-        const pulseFrequency = 4 // Slower than before for better visibility
-        const pulseAmount = Math.sin(state.clock.elapsedTime * pulseFrequency) * 0.3
+        // Dramatic pulsing when AI is speaking
+        const pulseAmount = Math.sin(state.clock.elapsedTime * 5) * 0.4
         const pulseScale = baseScale + pulseAmount
 
         // Log every few seconds to confirm pulsing
-        if (Math.floor(state.clock.elapsedTime * 2) % 4 === 0 && state.clock.elapsedTime % 1 < 0.1) {
+        if (Math.floor(state.clock.elapsedTime) % 2 === 0 && state.clock.elapsedTime % 1 < 0.1) {
           console.log("🔵 Sphere is pulsing! Scale:", pulseScale.toFixed(2))
         }
 
         meshRef.current.scale.setScalar(pulseScale)
 
         // Add rotation when speaking
-        meshRef.current.rotation.y = state.clock.elapsedTime * 0.6
-        meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.4) * 0.15
+        meshRef.current.rotation.y = state.clock.elapsedTime * 0.8
+        meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.2
       } else {
         // Subtle breathing animation when not speaking
         const breatheAmount = Math.sin(state.clock.elapsedTime * 0.8) * 0.03
@@ -238,7 +222,7 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow>
-      <sphereGeometry args={[1, 64, 64]} /> {/* Reduced from 128 to improve performance */}
+      <sphereGeometry args={[1, 128, 128]} />
       <meshPhysicalMaterial
         map={gradientTexture}
         color="#ffffff"
@@ -254,7 +238,7 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
         envMapIntensity={1.0}
         // More dramatic emissive when speaking
         emissive="#ffffff"
-        emissiveIntensity={isSpeaking ? 0.6 : 0.15}
+        emissiveIntensity={globalSpeakingState ? 0.8 : 0.2}
         emissiveMap={gradientTexture}
         sheen={1.0}
         sheenRoughness={0.1}

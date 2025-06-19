@@ -356,10 +356,8 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
         {React.Children.map(children, (child) => {
           console.log("🟡 Passing isSpeaking to child:", isSpeaking)
           if (React.isValidElement(child)) {
-            // Force a key change when isSpeaking changes to ensure re-render
             return React.cloneElement(child as React.ReactElement<any>, {
               isSpeaking: isSpeaking,
-              key: `sphere-${isSpeaking ? "speaking" : "silent"}`,
             })
           }
           return child
