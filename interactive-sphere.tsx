@@ -177,7 +177,7 @@ function GradientSphere() {
 
       if (isSpeaking) {
         // Dramatic pulsing when AI is speaking
-        const pulseAmount = Math.sin(state.clock.elapsedTime * 5) * 0.4
+        const pulseAmount = Math.sin(state.clock.elapsedTime * 5) * 0.1
         const pulseScale = baseScale + pulseAmount
 
         // Log every few seconds to confirm pulsing
