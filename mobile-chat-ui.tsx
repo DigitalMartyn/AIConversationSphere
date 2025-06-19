@@ -396,15 +396,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                       : "How can I help you today?"}
             </h1>
 
-            {/* Recording Status */}
-            {isRecording && (
-              <div className="bg-red-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                  <p className="text-white text-sm">Recording... Click again to send</p>
-                </div>
-              </div>
-            )}
+            {/* Recording Status - Removed */}
 
             {/* Show last user input */}
             {inputMessage && !isRecording && (
