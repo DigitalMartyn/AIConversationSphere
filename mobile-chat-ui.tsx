@@ -402,10 +402,6 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                     ? "I'm listening"
                     : "How can I help you today?"}
             </h1>
-            {/* Add debug info */}
-            <p className="text-white/60 text-xs">
-              Debug: isSpeaking={isSpeaking.toString()}, isProcessing={isProcessing.toString()}
-            </p>
 
             {/* Recording Status - Removed */}
 
