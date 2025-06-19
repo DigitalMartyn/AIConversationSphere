@@ -138,12 +138,12 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           sum += sample * sample
         }
         const rms = Math.sqrt(sum / dataArray.length)
-        const currentLevel = Math.floor(rms * 255)
+        const currentLevel = Math.floor(rms * 1000) // Increased multiplier for better visibility
 
         setAudioLevel(currentLevel)
 
-        if (currentLevel > 5) {
-          // Lower threshold for detection
+        if (currentLevel > 2) {
+          // Even lower threshold
           setMicrophoneWorking(true)
           addDebugMessage(`Audio detected! Level: ${currentLevel}`)
         }
