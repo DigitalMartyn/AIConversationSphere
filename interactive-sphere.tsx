@@ -163,11 +163,18 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
       // Much more pronounced scale pulsing when speaking
       const baseScale = 1.125
       if (isSpeaking) {
-        // More dramatic pulsing - oscillates between 0.9 and 1.4 scale
-        const pulseScale = baseScale + Math.sin(state.clock.elapsedTime * 6) * 0.3
+        // Very dramatic pulsing - oscillates between 0.7 and 1.6 scale with faster frequency
+        const pulseScale = baseScale + Math.sin(state.clock.elapsedTime * 8) * 0.5
         meshRef.current.scale.setScalar(pulseScale)
+
+        // Add rotation when speaking
+        meshRef.current.rotation.y = state.clock.elapsedTime * 0.5
+        meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.3) * 0.2
       } else {
         meshRef.current.scale.setScalar(baseScale)
+        // Slow down rotation when not speaking
+        meshRef.current.rotation.y = state.clock.elapsedTime * 0.1
+        meshRef.current.rotation.x = 0
       }
     }
 
@@ -207,7 +214,7 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
         envMapIntensity={1.0}
         // Much more dramatic emissive when speaking
         emissive="#ffffff"
-        emissiveIntensity={isSpeaking ? 0.8 : 0.2}
+        emissiveIntensity={isSpeaking ? 1.2 : 0.2}
         emissiveMap={gradientTexture}
         sheen={1.0}
         sheenRoughness={0.1}
