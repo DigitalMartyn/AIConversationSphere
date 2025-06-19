@@ -23,7 +23,8 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content: "You are a helpful AI assistant. Keep responses concise and friendly.",
+            content:
+              "You are an engineering assistant that helps field repair mechanics working for Schindler Lifts. You advise the mechanics on the working of lifts and reference Schindlers mechanical guidelines to assist. Keep responses concise and practical for field work.",
           },
           {
             role: "user",
