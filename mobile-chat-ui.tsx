@@ -324,6 +324,32 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }
 
+  // Add keyboard event listeners
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only trigger if space is pressed and we're not typing in an input field
+      if (event.code === "Space" && event.target?.tagName !== "INPUT") {
+        event.preventDefault() // Prevent page scroll
+        handleMicClick()
+      }
+    }
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      // Optional: Could be used for push-to-talk functionality in the future
+      if (event.code === "Space" && event.target?.tagName !== "INPUT") {
+        event.preventDefault()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    window.addEventListener("keyup", handleKeyUp)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("keyup", handleKeyUp)
+    }
+  }, [isProcessing, isSpeaking, isRecording]) // Dependencies to ensure handleMicClick has latest state
+
   const toggleTextInput = () => {
     setShowTextInput(!showTextInput)
     if (!showTextInput) {
