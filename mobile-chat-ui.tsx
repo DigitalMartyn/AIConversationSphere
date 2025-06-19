@@ -45,15 +45,18 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     audioRef.current = new Audio()
 
     audioRef.current.onplay = () => {
+      console.log("🎵 Audio started playing - setting isSpeaking to true")
       setIsSpeaking(true)
       setIsProcessing(false)
     }
 
     audioRef.current.onended = () => {
+      console.log("🎵 Audio ended - setting isSpeaking to false")
       setIsSpeaking(false)
     }
 
     audioRef.current.onpause = () => {
+      console.log("🎵 Audio paused - setting isSpeaking to false")
       setIsSpeaking(false)
     }
 
@@ -90,11 +93,13 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       utterance.volume = 0.8
 
       utterance.onstart = () => {
+        console.log("🗣️ Speech synthesis started - setting isSpeaking to true")
         setIsSpeaking(true)
         setIsProcessing(false)
       }
 
       utterance.onend = () => {
+        console.log("🗣️ Speech synthesis ended - setting isSpeaking to false")
         setIsSpeaking(false)
       }
 
@@ -395,6 +400,10 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                     ? "I'm listening"
                     : "How can I help you today?"}
             </h1>
+            {/* Add debug info */}
+            <p className="text-white/60 text-xs">
+              Debug: isSpeaking={isSpeaking.toString()}, isProcessing={isProcessing.toString()}
+            </p>
 
             {/* Recording Status - Removed */}
 
