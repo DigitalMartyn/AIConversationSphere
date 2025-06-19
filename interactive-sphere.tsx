@@ -130,6 +130,9 @@ function FloatingParticles() {
 function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
   const meshRef = useRef()
 
+  // Add debug logging
+  console.log("GradientSphere isSpeaking:", isSpeaking)
+
   // Create a simple horizontal gradient texture
   const gradientTexture = useMemo(() => {
     const canvas = document.createElement("canvas")
@@ -163,16 +166,16 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
       // Much more pronounced scale pulsing when speaking
       const baseScale = 1.125
       if (isSpeaking) {
-        // Very dramatic pulsing - oscillates between 0.7 and 1.6 scale with faster frequency
-        const pulseScale = baseScale + Math.sin(state.clock.elapsedTime * 8) * 0.5
+        // EXTREMELY dramatic pulsing - oscillates between 0.5 and 2.0 scale with very fast frequency
+        const pulseScale = 1.0 + Math.sin(state.clock.elapsedTime * 12) * 0.8
         meshRef.current.scale.setScalar(pulseScale)
 
-        // Add rotation when speaking
-        meshRef.current.rotation.y = state.clock.elapsedTime * 0.5
-        meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.3) * 0.2
+        // Add dramatic rotation when speaking
+        meshRef.current.rotation.y = state.clock.elapsedTime * 1.0
+        meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.3
       } else {
         meshRef.current.scale.setScalar(baseScale)
-        // Slow down rotation when not speaking
+        // Slow rotation when not speaking
         meshRef.current.rotation.y = state.clock.elapsedTime * 0.1
         meshRef.current.rotation.x = 0
       }
