@@ -394,13 +394,6 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                     : "AI Chat Assistant"}
             </h1>
 
-            {/* Recording Instructions */}
-            {!isRecording && !isProcessing && !isSpeaking && (
-              <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
-                <p className="text-white text-sm">🎤 Click the microphone button to start/stop recording</p>
-              </div>
-            )}
-
             {/* Recording Status */}
             {isRecording && (
               <div className="bg-red-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
