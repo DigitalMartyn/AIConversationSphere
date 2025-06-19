@@ -350,7 +350,9 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       <div className="absolute inset-0">
         {React.Children.map(children, (child) =>
           React.isValidElement(child)
-            ? React.cloneElement(child, { isSpeaking: isSpeaking || isRecording } as any)
+            ? React.cloneElement(child as React.ReactElement<any>, {
+                isSpeaking: isSpeaking,
+              })
             : child,
         )}
       </div>
