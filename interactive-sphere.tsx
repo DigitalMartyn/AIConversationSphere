@@ -20,7 +20,17 @@ export default function Component({ isSpeaking = false }: ComponentProps) {
 
   return (
     <div className="w-full h-screen" style={{ backgroundColor: "#c4b5fd" }}>
-      <Canvas camera={{ position: [0, 0, 5], fov: 45 }} shadows>
+      <Canvas
+        camera={{ position: [0, 0, 5], fov: 45 }}
+        shadows
+        gl={{
+          antialias: true,
+          alpha: false,
+          powerPreference: "high-performance",
+          preserveDrawingBuffer: false,
+        }}
+        dpr={[1, 2]} // Limit device pixel ratio to prevent excessive GPU usage
+      >
         <ambientLight intensity={0.6} color="#f5f0ff" />
         <directionalLight position={[5, 5, 5]} intensity={1.2} color="#ffffff" />
         <pointLight position={[-3, 2, 3]} intensity={0.5} color="#ff69b4" />
@@ -54,7 +64,7 @@ export default function Component({ isSpeaking = false }: ComponentProps) {
 }
 
 function FloatingParticles() {
-  const particleCount = 150
+  const particleCount = 100 // Reduced from 150 to improve performance
 
   // Create particle positions and properties
   const particleData = useMemo(() => {
@@ -96,17 +106,17 @@ function FloatingParticles() {
   // Create circular texture for round particles
   const circleTexture = useMemo(() => {
     const canvas = document.createElement("canvas")
-    canvas.width = 64
-    canvas.height = 64
+    canvas.width = 32 // Reduced from 64 to improve performance
+    canvas.height = 32
     const context = canvas.getContext("2d")
 
-    const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32)
+    const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16)
     gradient.addColorStop(0, "rgba(255, 255, 255, 1)")
     gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.5)")
     gradient.addColorStop(1, "rgba(255, 255, 255, 0)")
 
     context.fillStyle = gradient
-    context.fillRect(0, 0, 64, 64)
+    context.fillRect(0, 0, 32, 32)
 
     return new CanvasTexture(canvas)
   }, [])
@@ -137,23 +147,25 @@ function FloatingParticles() {
 
 function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
   const meshRef = useRef()
+  const lastSpeakingState = useRef(isSpeaking)
 
   // Add debug logging and useEffect to track changes
   console.log("🔴 GradientSphere isSpeaking:", isSpeaking)
 
   useEffect(() => {
     console.log("🔴 GradientSphere isSpeaking changed to:", isSpeaking)
+    lastSpeakingState.current = isSpeaking
   }, [isSpeaking])
 
   // Create a simple horizontal gradient texture
   const gradientTexture = useMemo(() => {
     const canvas = document.createElement("canvas")
-    canvas.width = 512
-    canvas.height = 512
+    canvas.width = 256 // Reduced from 512 to improve performance
+    canvas.height = 256
     const context = canvas.getContext("2d")
 
     // Create seamless wrapping gradient
-    const gradient = context.createLinearGradient(0, 0, 512, 0)
+    const gradient = context.createLinearGradient(0, 0, 256, 0)
     gradient.addColorStop(0, "#FF1493") // Deep pink
     gradient.addColorStop(0.25, "#9932CC") // Dark orchid
     gradient.addColorStop(0.5, "#1E90FF") // Dodger blue
@@ -161,7 +173,7 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
     gradient.addColorStop(1, "#FF1493") // Deep pink (back to start)
 
     context.fillStyle = gradient
-    context.fillRect(0, 0, 512, 512)
+    context.fillRect(0, 0, 256, 256)
 
     // Enable texture wrapping for seamless animation
     const texture = new CanvasTexture(canvas)
@@ -179,24 +191,26 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
       const baseScale = 1.125
 
       if (isSpeaking) {
-        // Log when animating in speaking mode
-        if (state.clock.elapsedTime % 1 < 0.1) {
-          console.log("🔵 Sphere is pulsing in speaking mode")
+        // More dramatic pulsing when AI is speaking
+        const pulseFrequency = 4 // Slower than before for better visibility
+        const pulseAmount = Math.sin(state.clock.elapsedTime * pulseFrequency) * 0.3
+        const pulseScale = baseScale + pulseAmount
+
+        // Log every few seconds to confirm pulsing
+        if (Math.floor(state.clock.elapsedTime * 2) % 4 === 0 && state.clock.elapsedTime % 1 < 0.1) {
+          console.log("🔵 Sphere is pulsing! Scale:", pulseScale.toFixed(2))
         }
 
-        // Dramatic pulsing when AI is speaking - use a faster frequency
-        const pulseAmount = Math.sin(state.clock.elapsedTime * 6) * 0.4
-        const pulseScale = baseScale + pulseAmount
-        meshRef.current.scale.set(pulseScale, pulseScale, pulseScale)
+        meshRef.current.scale.setScalar(pulseScale)
 
         // Add rotation when speaking
-        meshRef.current.rotation.y = state.clock.elapsedTime * 0.8
-        meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.2
+        meshRef.current.rotation.y = state.clock.elapsedTime * 0.6
+        meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.4) * 0.15
       } else {
         // Subtle breathing animation when not speaking
-        const breatheAmount = Math.sin(state.clock.elapsedTime * 0.5) * 0.05
+        const breatheAmount = Math.sin(state.clock.elapsedTime * 0.8) * 0.03
         const breatheScale = baseScale + breatheAmount
-        meshRef.current.scale.set(breatheScale, breatheScale, breatheScale)
+        meshRef.current.scale.setScalar(breatheScale)
 
         // Slow rotation when not speaking
         meshRef.current.rotation.y = state.clock.elapsedTime * 0.1
@@ -207,15 +221,15 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
     // Animate the texture UV coordinates for flowing gradient effect
     if (gradientTexture) {
       // Speed up texture animation when speaking
-      const speed = isSpeaking ? 0.3 : 0.1
+      const speed = isSpeaking ? 0.4 : 0.1
       gradientTexture.offset.x = (state.clock.elapsedTime * speed) % 1
 
       // Add more dramatic vertical flow when speaking
-      const verticalIntensity = isSpeaking ? 0.3 : 0.1
+      const verticalIntensity = isSpeaking ? 0.2 : 0.05
       gradientTexture.offset.y = Math.sin(state.clock.elapsedTime * 0.3) * verticalIntensity
 
       // More rotation when speaking
-      const rotationIntensity = isSpeaking ? 0.3 : 0.1
+      const rotationIntensity = isSpeaking ? 0.2 : 0.05
       gradientTexture.rotation = Math.sin(state.clock.elapsedTime * 0.2) * rotationIntensity
 
       gradientTexture.needsUpdate = true
@@ -224,7 +238,7 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow>
-      <sphereGeometry args={[1, 128, 128]} />
+      <sphereGeometry args={[1, 64, 64]} /> {/* Reduced from 128 to improve performance */}
       <meshPhysicalMaterial
         map={gradientTexture}
         color="#ffffff"
@@ -238,9 +252,9 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
         clearcoat={1.0}
         clearcoatRoughness={0.05}
         envMapIntensity={1.0}
-        // Much more dramatic emissive when speaking
+        // More dramatic emissive when speaking
         emissive="#ffffff"
-        emissiveIntensity={isSpeaking ? 0.8 : 0.2}
+        emissiveIntensity={isSpeaking ? 0.6 : 0.15}
         emissiveMap={gradientTexture}
         sheen={1.0}
         sheenRoughness={0.1}
