@@ -10,6 +10,9 @@ interface ComponentProps {
 }
 
 export default function Component({ isSpeaking = false }: ComponentProps) {
+  // Add debug logging at the top level
+  console.log("🟢 InteractiveSphere received isSpeaking:", isSpeaking)
+
   return (
     <div className="w-full h-screen" style={{ backgroundColor: "#c4b5fd" }}>
       <Canvas camera={{ position: [0, 0, 5], fov: 45 }} shadows>
