@@ -353,13 +353,14 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     <div className="relative w-full h-screen overflow-hidden">
       {/* 3D Background */}
       <div className="absolute inset-0">
-        {React.Children.map(children, (child) =>
-          React.isValidElement(child)
+        {React.Children.map(children, (child) => {
+          console.log("🟡 Passing isSpeaking to child:", isSpeaking)
+          return React.isValidElement(child)
             ? React.cloneElement(child as React.ReactElement<any>, {
                 isSpeaking: isSpeaking,
               })
-            : child,
-        )}
+            : child
+        })}
       </div>
 
       {/* Mobile UI Overlay */}
