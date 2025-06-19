@@ -164,7 +164,7 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
       const baseScale = 1.125
       if (isSpeaking) {
         // More dramatic pulsing - oscillates between 0.9 and 1.4 scale
-        const pulseScale = baseScale + Math.sin(state.clock.elapsedTime * 4) * 0.25
+        const pulseScale = baseScale + Math.sin(state.clock.elapsedTime * 6) * 0.3
         meshRef.current.scale.setScalar(pulseScale)
       } else {
         meshRef.current.scale.setScalar(baseScale)
@@ -174,15 +174,15 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
     // Animate the texture UV coordinates for flowing gradient effect
     if (gradientTexture) {
       // Speed up texture animation when speaking
-      const speed = isSpeaking ? 0.3 : 0.1
+      const speed = isSpeaking ? 0.5 : 0.1
       gradientTexture.offset.x = (state.clock.elapsedTime * speed) % 1
 
       // Add more dramatic vertical flow when speaking
-      const verticalIntensity = isSpeaking ? 0.3 : 0.1
+      const verticalIntensity = isSpeaking ? 0.4 : 0.1
       gradientTexture.offset.y = Math.sin(state.clock.elapsedTime * 0.3) * verticalIntensity
 
       // More rotation when speaking
-      const rotationIntensity = isSpeaking ? 0.3 : 0.1
+      const rotationIntensity = isSpeaking ? 0.4 : 0.1
       gradientTexture.rotation = Math.sin(state.clock.elapsedTime * 0.2) * rotationIntensity
 
       gradientTexture.needsUpdate = true
