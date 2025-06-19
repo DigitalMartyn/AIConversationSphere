@@ -368,21 +368,49 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
         const recognition = new SpeechRecognition()
 
-        // Use minimal configuration
+        // Try multiple language configurations
+        const languages = [
+          "en-US",
+          "en",
+          "en-GB",
+          "en-CA",
+          "en-AU",
+          navigator.language,
+          navigator.language.split("-")[0],
+        ]
+
+        // Remove duplicates
+        const uniqueLanguages = [...new Set(languages)]
+        addDebugMessage(`Available languages to try: ${uniqueLanguages.join(", ")}`)
+
+        // Use the first available language
+        const primaryLanguage = uniqueLanguages[0]
+        addDebugMessage(`Setting language to: ${primaryLanguage}`)
+
+        // Configure recognition with explicit language
+        recognition.lang = primaryLanguage
         recognition.continuous = false
         recognition.interimResults = true
+        recognition.maxAlternatives = 1
+
+        // Log all recognition properties
+        addDebugMessage(
+          `Recognition config - lang: ${recognition.lang}, continuous: ${recognition.continuous}, interimResults: ${recognition.interimResults}`,
+        )
 
         recognition.onstart = () => {
-          addDebugMessage("✅ Speech recognition started")
+          addDebugMessage("✅ Speech recognition started successfully")
           setIsListening(true)
           setCurrentTranscript("")
         }
 
         recognition.onresult = (event) => {
+          addDebugMessage(`Got ${event.results.length} results`)
           let transcript = ""
           for (let i = 0; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript
-            addDebugMessage(`Result ${i}: "${event.results[i][0].transcript}"`)
+            const result = event.results[i]
+            transcript += result[0].transcript
+            addDebugMessage(`Result ${i}: "${result[0].transcript}" (confidence: ${result[0].confidence})`)
           }
           setCurrentTranscript(transcript)
           if (transcript.trim()) {
@@ -395,6 +423,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           setIsListening(false)
           if (currentTranscript.trim() || inputMessage.trim()) {
             const finalText = currentTranscript.trim() || inputMessage.trim()
+            addDebugMessage(`Final transcript: "${finalText}"`)
             setTimeout(() => sendMessage(finalText), 500)
           }
         }
@@ -403,6 +432,25 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           addDebugMessage(`Speech recognition error: ${event.error}`)
           addDebugMessage(`Error details: ${JSON.stringify(event)}`)
           setIsListening(false)
+
+          // Try with a different language if language-not-supported
+          if (event.error === "language-not-supported") {
+            const nextLanguageIndex = uniqueLanguages.indexOf(primaryLanguage) + 1
+            if (nextLanguageIndex < uniqueLanguages.length) {
+              const nextLanguage = uniqueLanguages[nextLanguageIndex]
+              addDebugMessage(`Trying next language: ${nextLanguage}`)
+              setTimeout(() => {
+                startListeningWithLanguage(nextLanguage, uniqueLanguages, nextLanguageIndex)
+              }, 1000)
+            } else {
+              addDebugMessage("All languages failed, showing error")
+              alert(
+                `Speech recognition failed: ${event.error}. Your browser may not support speech recognition in your current language.`,
+              )
+            }
+          } else {
+            alert(`Speech recognition error: ${event.error}`)
+          }
         }
 
         recognitionRef.current = recognition
@@ -410,6 +458,79 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       } catch (error) {
         addDebugMessage(`Failed to start recognition: ${error}`)
         alert("Speech recognition failed. Please use text input.")
+      }
+    }
+  }
+
+  // Helper function to try different languages
+  const startListeningWithLanguage = (language, languageList, currentIndex) => {
+    if (isListening || isSpeaking || isProcessing) return
+
+    try {
+      addDebugMessage(`Attempting recognition with language: ${language}`)
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognition = new SpeechRecognition()
+
+      recognition.lang = language
+      recognition.continuous = false
+      recognition.interimResults = true
+      recognition.maxAlternatives = 1
+
+      recognition.onstart = () => {
+        addDebugMessage(`✅ Speech recognition started with ${language}`)
+        setIsListening(true)
+        setCurrentTranscript("")
+      }
+
+      recognition.onresult = (event) => {
+        let transcript = ""
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript
+        }
+        setCurrentTranscript(transcript)
+        if (transcript.trim()) {
+          setInputMessage(transcript.trim())
+        }
+      }
+
+      recognition.onend = () => {
+        addDebugMessage("Speech recognition ended")
+        setIsListening(false)
+        if (currentTranscript.trim() || inputMessage.trim()) {
+          const finalText = currentTranscript.trim() || inputMessage.trim()
+          setTimeout(() => sendMessage(finalText), 500)
+        }
+      }
+
+      recognition.onerror = (event) => {
+        addDebugMessage(`Language ${language} failed: ${event.error}`)
+        setIsListening(false)
+
+        if (event.error === "language-not-supported") {
+          const nextIndex = currentIndex + 1
+          if (nextIndex < languageList.length) {
+            const nextLanguage = languageList[nextIndex]
+            setTimeout(() => {
+              startListeningWithLanguage(nextLanguage, languageList, nextIndex)
+            }, 1000)
+          } else {
+            addDebugMessage("All languages exhausted")
+            alert("Speech recognition is not supported in any available language on this device.")
+          }
+        } else {
+          alert(`Speech recognition error: ${event.error}`)
+        }
+      }
+
+      recognitionRef.current = recognition
+      recognition.start()
+    } catch (error) {
+      addDebugMessage(`Failed to start recognition with ${language}: ${error}`)
+      const nextIndex = currentIndex + 1
+      if (nextIndex < languageList.length) {
+        setTimeout(() => {
+          startListeningWithLanguage(languageList[nextIndex], languageList, nextIndex)
+        }, 1000)
       }
     }
   }
