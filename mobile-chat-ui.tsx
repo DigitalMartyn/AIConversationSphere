@@ -4,42 +4,28 @@ import React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Mic, X, Settings, Send, MicOff, Info, Volume2 } from "lucide-react"
+import { Mic, X, Settings, Send, MicOff, Info } from "lucide-react"
 
 interface MobileChatUIProps {
   children: React.ReactNode
 }
 
-// Define the SpeechRecognition type for TypeScript
-declare global {
-  interface Window {
-    SpeechRecognition: any
-    webkitSpeechRecognition: any
-    AudioContext: any
-    webkitAudioContext: any
-  }
-}
-
 export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isListening, setIsListening] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
   const [lastResponse, setLastResponse] = useState("")
   const [inputMessage, setInputMessage] = useState("")
-  const [showTextInput, setShowTextInput] = useState(true) // Default to text input
-  const [speechRecognitionSupported, setSpeechRecognitionSupported] = useState(false)
-  const [currentTranscript, setCurrentTranscript] = useState("")
+  const [showTextInput, setShowTextInput] = useState(true)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
   const [showDebugInfo, setShowDebugInfo] = useState(false)
-  const [microphoneWorking, setMicrophoneWorking] = useState(false)
-  const [audioLevel, setAudioLevel] = useState(0)
-  const [isTestingMic, setIsTestingMic] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const recognitionRef = useRef<any>(null)
-  const audioContextRef = useRef<any>(null)
-  const analyserRef = useRef<any>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Add debug message
   const addDebugMessage = (message: string) => {
@@ -49,155 +35,11 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     setDebugInfo((prev) => [...prev.slice(-9), debugMessage]) // Keep last 10 messages
   }
 
-  // Test microphone with multiple detection methods
-  const testMicrophone = async () => {
-    if (isTestingMic) {
-      // Stop testing
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop())
-        streamRef.current = null
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
-        audioContextRef.current = null
-      }
-      setIsTestingMic(false)
-      setAudioLevel(0)
-      addDebugMessage("Microphone test stopped")
-      return
-    }
-
-    try {
-      addDebugMessage("🎤 Starting microphone test...")
-      setIsTestingMic(true)
-
-      // Request microphone access with explicit constraints
-      const constraints = {
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          sampleRate: 44100,
-        },
-        video: false,
-      }
-
-      addDebugMessage(`Requesting microphone with constraints: ${JSON.stringify(constraints)}`)
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints)
-      streamRef.current = stream
-      addDebugMessage("✅ Microphone stream obtained")
-
-      // Log stream details
-      const audioTracks = stream.getAudioTracks()
-      addDebugMessage(`Audio tracks: ${audioTracks.length}`)
-      if (audioTracks.length > 0) {
-        const track = audioTracks[0]
-        addDebugMessage(`Track label: ${track.label}`)
-        addDebugMessage(`Track enabled: ${track.enabled}`)
-        addDebugMessage(`Track ready state: ${track.readyState}`)
-        addDebugMessage(`Track settings: ${JSON.stringify(track.getSettings())}`)
-      }
-
-      // Create audio context for real-time monitoring
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      audioContextRef.current = audioContext
-      addDebugMessage(`Audio context created, state: ${audioContext.state}`)
-
-      // Resume audio context if suspended
-      if (audioContext.state === "suspended") {
-        await audioContext.resume()
-        addDebugMessage(`Audio context resumed, new state: ${audioContext.state}`)
-      }
-
-      const source = audioContext.createMediaStreamSource(stream)
-      const analyser = audioContext.createAnalyser()
-      analyserRef.current = analyser
-
-      // Configure analyser for maximum sensitivity
-      analyser.fftSize = 256
-      analyser.smoothingTimeConstant = 0.8
-      source.connect(analyser)
-
-      addDebugMessage(
-        `Analyser configured - fftSize: ${analyser.fftSize}, frequencyBinCount: ${analyser.frequencyBinCount}`,
-      )
-
-      const bufferLength = analyser.frequencyBinCount
-      const dataArray = new Uint8Array(bufferLength)
-
-      // Real-time audio level monitoring with multiple methods
-      const updateAudioLevel = () => {
-        if (!isTestingMic || !analyserRef.current) return
-
-        // Method 1: Frequency domain analysis
-        analyser.getByteFrequencyData(dataArray)
-        const frequencyLevel = Math.max(...dataArray)
-
-        // Method 2: Time domain analysis
-        const timeDataArray = new Uint8Array(bufferLength)
-        analyser.getByteTimeDomainData(timeDataArray)
-
-        // Calculate RMS from time domain
-        let sum = 0
-        for (let i = 0; i < timeDataArray.length; i++) {
-          const sample = (timeDataArray[i] - 128) / 128
-          sum += sample * sample
-        }
-        const rms = Math.sqrt(sum / timeDataArray.length)
-        const timeLevel = Math.floor(rms * 255)
-
-        // Use the higher of the two methods
-        const currentLevel = Math.max(frequencyLevel, timeLevel)
-
-        setAudioLevel(currentLevel)
-
-        // Log levels periodically for debugging
-        if (Math.random() < 0.1) {
-          // 10% chance to log
-          addDebugMessage(`Audio levels - Frequency: ${frequencyLevel}, Time: ${timeLevel}, Final: ${currentLevel}`)
-        }
-
-        if (currentLevel > 1) {
-          // Very low threshold
-          setMicrophoneWorking(true)
-          addDebugMessage(`Audio detected! Level: ${currentLevel}`)
-        }
-
-        requestAnimationFrame(updateAudioLevel)
-      }
-
-      updateAudioLevel()
-      addDebugMessage("🔊 Microphone test started - speak to see audio levels")
-      addDebugMessage("Audio monitoring loop started with dual detection methods")
-    } catch (error) {
-      addDebugMessage(`❌ Microphone test failed: ${error.message}`)
-      addDebugMessage(`Error name: ${error.name}`)
-      addDebugMessage(`Error stack: ${error.stack}`)
-      setIsTestingMic(false)
-      alert(`Microphone access failed: ${error.message}`)
-    }
-  }
-
-  // Force enable speech recognition (skip microphone test)
-  const forceEnableSpeechRecognition = () => {
-    addDebugMessage("Force enabling speech recognition...")
-    setSpeechRecognitionSupported(true)
-    setMicrophoneWorking(true)
-    setShowTextInput(false)
-    addDebugMessage("Speech recognition force enabled - microphone issues bypassed")
-  }
-
-  // Initialize audio element and speech recognition
+  // Initialize audio element
   useEffect(() => {
     addDebugMessage("Starting initialization...")
-
-    // Log browser information
     addDebugMessage(`Browser: ${navigator.userAgent}`)
-    addDebugMessage(`Language: ${navigator.language}`)
-    addDebugMessage(`Languages: ${navigator.languages?.join(", ") || "Not available"}`)
-    addDebugMessage(`Platform: ${navigator.platform}`)
-    addDebugMessage(`Online: ${navigator.onLine}`)
+    addDebugMessage(`MediaRecorder supported: ${typeof MediaRecorder !== "undefined"}`)
 
     // Initialize audio element
     audioRef.current = new Audio()
@@ -222,29 +64,12 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       fallbackToSpeechSynthesis()
     }
 
-    // Check for speech recognition support (but don't enable it yet)
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      if (SpeechRecognition) {
-        addDebugMessage("SpeechRecognition API found")
-      } else {
-        addDebugMessage("Speech recognition not supported in this browser")
-      }
-    }
-
     return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop()
-        } catch (e) {
-          addDebugMessage(`Error stopping recognition: ${e}`)
-        }
-      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop())
       }
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current)
       }
       if (audioRef.current) {
         audioRef.current.pause()
@@ -343,205 +168,124 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }
 
-  const enableSpeechRecognition = () => {
-    if (!microphoneWorking) {
-      alert("Please test your microphone first to ensure it's working properly.")
-      return
-    }
-
-    addDebugMessage("Enabling speech recognition...")
-    setSpeechRecognitionSupported(true)
-    setShowTextInput(false)
-    addDebugMessage("Speech recognition enabled - you can now use the microphone button")
-  }
-
-  const startListening = async () => {
-    if (!speechRecognitionSupported) {
-      alert("Please enable speech recognition first.")
-      return
-    }
-
-    addDebugMessage("=== Starting speech recognition ===")
-
-    if (!isListening && !isSpeaking && !isProcessing) {
-      try {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-        const recognition = new SpeechRecognition()
-
-        // Try multiple language configurations
-        const languages = [
-          "en-US",
-          "en",
-          "en-GB",
-          "en-CA",
-          "en-AU",
-          navigator.language,
-          navigator.language.split("-")[0],
-        ]
-
-        // Remove duplicates
-        const uniqueLanguages = [...new Set(languages)]
-        addDebugMessage(`Available languages to try: ${uniqueLanguages.join(", ")}`)
-
-        // Use the first available language
-        const primaryLanguage = uniqueLanguages[0]
-        addDebugMessage(`Setting language to: ${primaryLanguage}`)
-
-        // Configure recognition with explicit language
-        recognition.lang = primaryLanguage
-        recognition.continuous = false
-        recognition.interimResults = true
-        recognition.maxAlternatives = 1
-
-        // Log all recognition properties
-        addDebugMessage(
-          `Recognition config - lang: ${recognition.lang}, continuous: ${recognition.continuous}, interimResults: ${recognition.interimResults}`,
-        )
-
-        recognition.onstart = () => {
-          addDebugMessage("✅ Speech recognition started successfully")
-          setIsListening(true)
-          setCurrentTranscript("")
-        }
-
-        recognition.onresult = (event) => {
-          addDebugMessage(`Got ${event.results.length} results`)
-          let transcript = ""
-          for (let i = 0; i < event.results.length; i++) {
-            const result = event.results[i]
-            transcript += result[0].transcript
-            addDebugMessage(`Result ${i}: "${result[0].transcript}" (confidence: ${result[0].confidence})`)
-          }
-          setCurrentTranscript(transcript)
-          if (transcript.trim()) {
-            setInputMessage(transcript.trim())
-          }
-        }
-
-        recognition.onend = () => {
-          addDebugMessage("Speech recognition ended")
-          setIsListening(false)
-          if (currentTranscript.trim() || inputMessage.trim()) {
-            const finalText = currentTranscript.trim() || inputMessage.trim()
-            addDebugMessage(`Final transcript: "${finalText}"`)
-            setTimeout(() => sendMessage(finalText), 500)
-          }
-        }
-
-        recognition.onerror = (event) => {
-          addDebugMessage(`Speech recognition error: ${event.error}`)
-          addDebugMessage(`Error details: ${JSON.stringify(event)}`)
-          setIsListening(false)
-
-          // Try with a different language if language-not-supported
-          if (event.error === "language-not-supported") {
-            const nextLanguageIndex = uniqueLanguages.indexOf(primaryLanguage) + 1
-            if (nextLanguageIndex < uniqueLanguages.length) {
-              const nextLanguage = uniqueLanguages[nextLanguageIndex]
-              addDebugMessage(`Trying next language: ${nextLanguage}`)
-              setTimeout(() => {
-                startListeningWithLanguage(nextLanguage, uniqueLanguages, nextLanguageIndex)
-              }, 1000)
-            } else {
-              addDebugMessage("All languages failed, showing error")
-              alert(
-                `Speech recognition failed: ${event.error}. Your browser may not support speech recognition in your current language.`,
-              )
-            }
-          } else {
-            alert(`Speech recognition error: ${event.error}`)
-          }
-        }
-
-        recognitionRef.current = recognition
-        recognition.start()
-      } catch (error) {
-        addDebugMessage(`Failed to start recognition: ${error}`)
-        alert("Speech recognition failed. Please use text input.")
-      }
-    }
-  }
-
-  // Helper function to try different languages
-  const startListeningWithLanguage = (language, languageList, currentIndex) => {
-    if (isListening || isSpeaking || isProcessing) return
+  const startRecording = async () => {
+    if (isRecording || isSpeaking || isProcessing) return
 
     try {
-      addDebugMessage(`Attempting recognition with language: ${language}`)
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      const recognition = new SpeechRecognition()
+      addDebugMessage("🎤 Starting audio recording...")
 
-      recognition.lang = language
-      recognition.continuous = false
-      recognition.interimResults = true
-      recognition.maxAlternatives = 1
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      })
 
-      recognition.onstart = () => {
-        addDebugMessage(`✅ Speech recognition started with ${language}`)
-        setIsListening(true)
-        setCurrentTranscript("")
-      }
+      streamRef.current = stream
+      audioChunksRef.current = []
 
-      recognition.onresult = (event) => {
-        let transcript = ""
-        for (let i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript
-        }
-        setCurrentTranscript(transcript)
-        if (transcript.trim()) {
-          setInputMessage(transcript.trim())
-        }
-      }
+      // Create MediaRecorder
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm;codecs=opus",
+      })
 
-      recognition.onend = () => {
-        addDebugMessage("Speech recognition ended")
-        setIsListening(false)
-        if (currentTranscript.trim() || inputMessage.trim()) {
-          const finalText = currentTranscript.trim() || inputMessage.trim()
-          setTimeout(() => sendMessage(finalText), 500)
+      mediaRecorderRef.current = mediaRecorder
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
         }
       }
 
-      recognition.onerror = (event) => {
-        addDebugMessage(`Language ${language} failed: ${event.error}`)
-        setIsListening(false)
+      mediaRecorder.onstop = async () => {
+        addDebugMessage("Recording stopped, processing audio...")
+        setIsRecording(false)
+        setRecordingTime(0)
 
-        if (event.error === "language-not-supported") {
-          const nextIndex = currentIndex + 1
-          if (nextIndex < languageList.length) {
-            const nextLanguage = languageList[nextIndex]
-            setTimeout(() => {
-              startListeningWithLanguage(nextLanguage, languageList, nextIndex)
-            }, 1000)
-          } else {
-            addDebugMessage("All languages exhausted")
-            alert("Speech recognition is not supported in any available language on this device.")
-          }
-        } else {
-          alert(`Speech recognition error: ${event.error}`)
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current)
+        }
+
+        // Create audio blob
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" })
+        addDebugMessage(`Audio blob created, size: ${audioBlob.size} bytes`)
+
+        // Send to Whisper API for transcription
+        await transcribeAudio(audioBlob)
+
+        // Clean up
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop())
+          streamRef.current = null
         }
       }
 
-      recognitionRef.current = recognition
-      recognition.start()
+      mediaRecorder.onerror = (event) => {
+        addDebugMessage(`MediaRecorder error: ${event.error}`)
+        setIsRecording(false)
+        setRecordingTime(0)
+      }
+
+      // Start recording
+      mediaRecorder.start(100) // Collect data every 100ms
+      setIsRecording(true)
+      setRecordingTime(0)
+
+      // Start timer
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1)
+      }, 1000)
+
+      addDebugMessage("✅ Recording started successfully")
     } catch (error) {
-      addDebugMessage(`Failed to start recognition with ${language}: ${error}`)
-      const nextIndex = currentIndex + 1
-      if (nextIndex < languageList.length) {
-        setTimeout(() => {
-          startListeningWithLanguage(languageList[nextIndex], languageList, nextIndex)
-        }, 1000)
-      }
+      addDebugMessage(`❌ Failed to start recording: ${error.message}`)
+      alert(`Microphone access failed: ${error.message}`)
     }
   }
 
-  const stopListening = () => {
-    if (recognitionRef.current && isListening) {
-      try {
-        recognitionRef.current.stop()
-      } catch (error) {
-        addDebugMessage(`Error stopping speech recognition: ${error}`)
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      addDebugMessage("Stopping recording...")
+      mediaRecorderRef.current.stop()
+    }
+  }
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    try {
+      setIsProcessing(true)
+      addDebugMessage("Sending audio to Whisper API...")
+
+      const formData = new FormData()
+      formData.append("audio", audioBlob, "recording.webm")
+
+      const response = await fetch("/api/whisper", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error(`Whisper API error: ${response.status}`)
       }
+
+      const data = await response.json()
+      const transcript = data.text?.trim()
+
+      if (transcript) {
+        addDebugMessage(`Transcript received: "${transcript}"`)
+        setInputMessage(transcript)
+        await sendMessage(transcript)
+      } else {
+        addDebugMessage("No transcript received")
+        alert("Could not understand the audio. Please try again or use text input.")
+        setIsProcessing(false)
+      }
+    } catch (error) {
+      addDebugMessage(`Transcription error: ${error.message}`)
+      alert(`Speech-to-text failed: ${error.message}`)
+      setIsProcessing(false)
     }
   }
 
@@ -568,10 +312,10 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   const handleMicClick = () => {
     if (isSpeaking) {
       stopSpeaking()
-    } else if (isListening) {
-      stopListening()
+    } else if (isRecording) {
+      stopRecording()
     } else {
-      startListening()
+      startRecording()
     }
   }
 
@@ -588,9 +332,16 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   const clearAll = () => {
     setLastResponse("")
     setInputMessage("")
-    setCurrentTranscript("")
     stopSpeaking()
-    stopListening()
+    if (isRecording) {
+      stopRecording()
+    }
+  }
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
   return (
@@ -599,7 +350,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       <div className="absolute inset-0">
         {React.Children.map(children, (child) =>
           React.isValidElement(child)
-            ? React.cloneElement(child, { isSpeaking: isSpeaking || isListening } as any)
+            ? React.cloneElement(child, { isSpeaking: isSpeaking || isRecording } as any)
             : child,
         )}
       </div>
@@ -638,70 +389,30 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                 ? "Processing..."
                 : isSpeaking
                   ? "AI Speaking..."
-                  : isListening
-                    ? "Listening..."
+                  : isRecording
+                    ? `Recording... ${formatTime(recordingTime)}`
                     : "AI Chat Assistant"}
             </h1>
 
-            {/* Microphone Test Section */}
-            {!microphoneWorking && (
-              <div className="bg-yellow-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
-                <p className="text-white text-sm mb-3">🎤 Test your microphone:</p>
-                <div className="space-y-2">
-                  <Button
-                    onClick={testMicrophone}
-                    className={`w-full ${isTestingMic ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600"}`}
-                  >
-                    {isTestingMic ? "Stop Test" : "Test Microphone"}
-                  </Button>
-                  <Button onClick={forceEnableSpeechRecognition} className="w-full bg-orange-500 hover:bg-orange-600">
-                    Skip Test & Try Speech Recognition
-                  </Button>
-                </div>
-                {isTestingMic && (
-                  <div className="mt-3">
-                    <div className="flex items-center gap-2">
-                      <Volume2 className="w-4 h-4 text-white" />
-                      <div className="flex-1 bg-white/20 rounded-full h-2">
-                        <div
-                          className="bg-green-500 h-2 rounded-full transition-all duration-100"
-                          style={{ width: `${Math.min(100, (audioLevel / 255) * 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-white">{audioLevel}/255</span>
-                    </div>
-                    <p className="text-xs text-white/80 mt-1">Speak loudly to see audio levels</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Enable Speech Recognition */}
-            {microphoneWorking && !speechRecognitionSupported && (
-              <div className="bg-green-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
-                <p className="text-white text-sm mb-3">✅ Microphone working! Enable speech recognition:</p>
-                <Button onClick={enableSpeechRecognition} className="w-full bg-green-500 hover:bg-green-600">
-                  Enable Speech Recognition
-                </Button>
-              </div>
-            )}
-
-            {/* Speech Recognition Ready */}
-            {speechRecognitionSupported && (
+            {/* Recording Instructions */}
+            {!isRecording && !isProcessing && !isSpeaking && (
               <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
-                <p className="text-white text-sm">🎤 Speech recognition ready! Click the microphone button to speak.</p>
+                <p className="text-white text-sm">🎤 Hold the microphone button to record your message</p>
               </div>
             )}
 
-            {/* Show current transcript while listening */}
-            {isListening && (
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
-                <p className="text-white text-sm">{currentTranscript || "Listening..."}</p>
+            {/* Recording Status */}
+            {isRecording && (
+              <div className="bg-red-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                  <p className="text-white text-sm">Recording... Release to send</p>
+                </div>
               </div>
             )}
 
             {/* Show last user input */}
-            {inputMessage && !isListening && (
+            {inputMessage && !isRecording && (
               <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
                 <p className="text-white/90 text-sm">You: "{inputMessage}"</p>
               </div>
@@ -760,16 +471,18 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                   ? "bg-purple-500 hover:bg-purple-600 text-white"
                   : isSpeaking
                     ? "bg-blue-500 hover:bg-blue-600 text-white"
-                    : isListening
+                    : isRecording
                       ? "bg-red-500 hover:bg-red-600 text-white"
-                      : speechRecognitionSupported
-                        ? "hover:bg-white/20 text-white"
-                        : "bg-gray-500 text-gray-300"
+                      : "hover:bg-white/20 text-white"
               }`}
-              disabled={isProcessing || !speechRecognitionSupported}
+              disabled={isProcessing}
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onTouchStart={startRecording}
+              onTouchEnd={stopRecording}
               onClick={handleMicClick}
             >
-              {isListening ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
+              {isRecording ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
             </Button>
 
             <Button
