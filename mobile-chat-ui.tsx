@@ -398,13 +398,6 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
             {/* Recording Status - Removed */}
 
-            {/* Show AI response */}
-            {lastResponse && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
-                <p className="text-white/80 text-sm">AI: "{lastResponse}"</p>
-              </div>
-            )}
-
             {/* Text Input Area */}
             {showTextInput && (
               <div className="mt-6 w-full max-w-md">
