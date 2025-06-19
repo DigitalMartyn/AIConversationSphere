@@ -175,18 +175,29 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
       const baseY = Math.sin(state.clock.elapsedTime * 0.5) * 0.1
       meshRef.current.position.y = baseY
 
-      // Much more pronounced scale pulsing when speaking
-      const baseScale = 1.125 // Back to original size
+      // Base scale and animation parameters
+      const baseScale = 1.125
+
       if (isSpeaking) {
-        // Dramatic pulsing when AI is speaking
-        const pulseScale = baseScale + Math.sin(state.clock.elapsedTime * 6) * 0.4
-        meshRef.current.scale.setScalar(pulseScale)
+        // Log when animating in speaking mode
+        if (state.clock.elapsedTime % 1 < 0.1) {
+          console.log("🔵 Sphere is pulsing in speaking mode")
+        }
+
+        // Dramatic pulsing when AI is speaking - use a faster frequency
+        const pulseAmount = Math.sin(state.clock.elapsedTime * 6) * 0.4
+        const pulseScale = baseScale + pulseAmount
+        meshRef.current.scale.set(pulseScale, pulseScale, pulseScale)
 
         // Add rotation when speaking
         meshRef.current.rotation.y = state.clock.elapsedTime * 0.8
         meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.2
       } else {
-        meshRef.current.scale.setScalar(baseScale)
+        // Subtle breathing animation when not speaking
+        const breatheAmount = Math.sin(state.clock.elapsedTime * 0.5) * 0.05
+        const breatheScale = baseScale + breatheAmount
+        meshRef.current.scale.set(breatheScale, breatheScale, breatheScale)
+
         // Slow rotation when not speaking
         meshRef.current.rotation.y = state.clock.elapsedTime * 0.1
         meshRef.current.rotation.x = 0
