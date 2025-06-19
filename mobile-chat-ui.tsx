@@ -386,7 +386,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           <div className="text-center mb-8">
             <h1 className="text-xl font-medium text-white mb-4 drop-shadow-lg tracking-wide">
               {isProcessing
-                ? "Processing..."
+                ? "Thinking..."
                 : isSpeaking
                   ? "AI Speaking..."
                   : isRecording
