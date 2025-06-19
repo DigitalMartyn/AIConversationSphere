@@ -71,39 +71,81 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       addDebugMessage("🎤 Starting microphone test...")
       setIsTestingMic(true)
 
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Request microphone access with explicit constraints
+      const constraints = {
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          sampleRate: 44100,
         },
-      })
+        video: false,
+      }
+
+      addDebugMessage(`Requesting microphone with constraints: ${JSON.stringify(constraints)}`)
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
       streamRef.current = stream
-      addDebugMessage("✅ Microphone access granted")
+      addDebugMessage("✅ Microphone stream obtained")
+
+      // Log stream details
+      const audioTracks = stream.getAudioTracks()
+      addDebugMessage(`Audio tracks: ${audioTracks.length}`)
+      if (audioTracks.length > 0) {
+        const track = audioTracks[0]
+        addDebugMessage(`Track label: ${track.label}`)
+        addDebugMessage(`Track enabled: ${track.enabled}`)
+        addDebugMessage(`Track ready state: ${track.readyState}`)
+        addDebugMessage(`Track settings: ${JSON.stringify(track.getSettings())}`)
+      }
 
       // Create audio context for real-time monitoring
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
       audioContextRef.current = audioContext
+      addDebugMessage(`Audio context created, state: ${audioContext.state}`)
+
+      // Resume audio context if suspended
+      if (audioContext.state === "suspended") {
+        await audioContext.resume()
+        addDebugMessage(`Audio context resumed, new state: ${audioContext.state}`)
+      }
 
       const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
       analyserRef.current = analyser
 
-      analyser.fftSize = 256
+      // Configure analyser for better sensitivity
+      analyser.fftSize = 2048
+      analyser.smoothingTimeConstant = 0.3
       source.connect(analyser)
+
+      addDebugMessage(
+        `Analyser configured - fftSize: ${analyser.fftSize}, frequencyBinCount: ${analyser.frequencyBinCount}`,
+      )
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount)
 
       // Real-time audio level monitoring
       const updateAudioLevel = () => {
-        if (!isTestingMic) return
+        if (!isTestingMic || !analyserRef.current) return
 
-        analyser.getByteFrequencyData(dataArray)
-        const currentLevel = Math.max(...dataArray)
+        analyser.getByteTimeDomainData(dataArray)
+
+        // Calculate RMS (Root Mean Square) for better audio level detection
+        let sum = 0
+        for (let i = 0; i < dataArray.length; i++) {
+          const sample = (dataArray[i] - 128) / 128 // Convert to -1 to 1 range
+          sum += sample * sample
+        }
+        const rms = Math.sqrt(sum / dataArray.length)
+        const currentLevel = Math.floor(rms * 255)
+
         setAudioLevel(currentLevel)
 
-        if (currentLevel > 10) {
+        if (currentLevel > 5) {
+          // Lower threshold for detection
           setMicrophoneWorking(true)
+          addDebugMessage(`Audio detected! Level: ${currentLevel}`)
         }
 
         requestAnimationFrame(updateAudioLevel)
@@ -111,8 +153,11 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
       updateAudioLevel()
       addDebugMessage("🔊 Microphone test started - speak to see audio levels")
+      addDebugMessage("Audio monitoring loop started")
     } catch (error) {
       addDebugMessage(`❌ Microphone test failed: ${error.message}`)
+      addDebugMessage(`Error name: ${error.name}`)
+      addDebugMessage(`Error stack: ${error.stack}`)
       setIsTestingMic(false)
       alert(`Microphone access failed: ${error.message}`)
     }
