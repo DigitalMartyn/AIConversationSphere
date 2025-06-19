@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useMemo } from "react"
+import { useRef, useMemo, useEffect } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, ContactShadows, Environment } from "@react-three/drei"
 import { CanvasTexture, AdditiveBlending } from "three"
@@ -9,7 +9,16 @@ interface ComponentProps {
   isSpeaking?: boolean
 }
 
+// Create a global state that can be accessed by the sphere
+let globalSpeakingState = false
+
 export default function Component({ isSpeaking = false }: ComponentProps) {
+  // Update global state whenever prop changes
+  useEffect(() => {
+    console.log("🟢 InteractiveSphere isSpeaking changed to:", isSpeaking)
+    globalSpeakingState = isSpeaking
+  }, [isSpeaking])
+
   return (
     <div className="w-full h-screen" style={{ backgroundColor: "#c4b5fd" }}>
       <Canvas camera={{ position: [0, 0, 5], fov: 45 }} shadows>
@@ -26,7 +35,7 @@ export default function Component({ isSpeaking = false }: ComponentProps) {
           </mesh>
         </Environment>
 
-        <GradientSphere isSpeaking={isSpeaking} />
+        <GradientSphere />
         <FloatingParticles />
 
         <ContactShadows position={[0, -2.5, 0]} opacity={0.15} scale={3} blur={1.5} far={1.5} resolution={256} />
@@ -127,7 +136,7 @@ function FloatingParticles() {
   )
 }
 
-function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
+function GradientSphere() {
   const meshRef = useRef()
 
   // Create a simple horizontal gradient texture
@@ -155,34 +164,56 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
   }, [])
 
   useFrame((state) => {
+    // Access the global speaking state directly
+    const isSpeaking = globalSpeakingState
+
     if (meshRef.current) {
       // Base floating animation
       const baseY = Math.sin(state.clock.elapsedTime * 0.5) * 0.1
       meshRef.current.position.y = baseY
 
-      // Much more pronounced scale pulsing when speaking
-      const baseScale = 1.125
+      // Base scale and animation parameters
+      const baseScale = 1.5
+
       if (isSpeaking) {
-        // More dramatic pulsing - oscillates between 0.9 and 1.4 scale
-        const pulseScale = baseScale + Math.sin(state.clock.elapsedTime * 4) * 0.25
+        // Dramatic pulsing when AI is speaking
+        const pulseAmount = Math.sin(state.clock.elapsedTime * 5) * 0.1
+        const pulseScale = baseScale + pulseAmount
+
+        // Log every few seconds to confirm pulsing
+        if (Math.floor(state.clock.elapsedTime) % 2 === 0 && state.clock.elapsedTime % 1 < 0.1) {
+          console.log("🔵 Sphere is pulsing! Scale:", pulseScale.toFixed(2))
+        }
+
         meshRef.current.scale.setScalar(pulseScale)
+
+        // Add rotation when speaking
+        meshRef.current.rotation.y = state.clock.elapsedTime * 0.8
+        meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.2
       } else {
-        meshRef.current.scale.setScalar(baseScale)
+        // Subtle breathing animation when not speaking
+        const breatheAmount = Math.sin(state.clock.elapsedTime * 0.8) * 0.03
+        const breatheScale = baseScale + breatheAmount
+        meshRef.current.scale.setScalar(breatheScale)
+
+        // Slow rotation when not speaking
+        meshRef.current.rotation.y = state.clock.elapsedTime * 0.1
+        meshRef.current.rotation.x = 0
       }
     }
 
     // Animate the texture UV coordinates for flowing gradient effect
     if (gradientTexture) {
       // Speed up texture animation when speaking
-      const speed = isSpeaking ? 0.3 : 0.1
+      const speed = isSpeaking ? 0.4 : 0.1
       gradientTexture.offset.x = (state.clock.elapsedTime * speed) % 1
 
       // Add more dramatic vertical flow when speaking
-      const verticalIntensity = isSpeaking ? 0.3 : 0.1
+      const verticalIntensity = isSpeaking ? 0.2 : 0.05
       gradientTexture.offset.y = Math.sin(state.clock.elapsedTime * 0.3) * verticalIntensity
 
       // More rotation when speaking
-      const rotationIntensity = isSpeaking ? 0.3 : 0.1
+      const rotationIntensity = isSpeaking ? 0.2 : 0.05
       gradientTexture.rotation = Math.sin(state.clock.elapsedTime * 0.2) * rotationIntensity
 
       gradientTexture.needsUpdate = true
@@ -205,9 +236,9 @@ function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
         clearcoat={1.0}
         clearcoatRoughness={0.05}
         envMapIntensity={1.0}
-        // Much more dramatic emissive when speaking
+        // More dramatic emissive when speaking
         emissive="#ffffff"
-        emissiveIntensity={isSpeaking ? 0.8 : 0.2}
+        emissiveIntensity={globalSpeakingState ? 0.8 : 0.2}
         emissiveMap={gradientTexture}
         sheen={1.0}
         sheenRoughness={0.1}

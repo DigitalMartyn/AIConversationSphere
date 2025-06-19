@@ -4,7 +4,7 @@ import React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Mic, X, Settings, Send, MicOff, Info } from "lucide-react"
+import { Mic, X, Keyboard, Send, MicOff, Info } from "lucide-react"
 
 interface MobileChatUIProps {
   children: React.ReactNode
@@ -16,7 +16,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [lastResponse, setLastResponse] = useState("")
   const [inputMessage, setInputMessage] = useState("")
-  const [showTextInput, setShowTextInput] = useState(true)
+  const [showTextInput, setShowTextInput] = useState(false)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
   const [showDebugInfo, setShowDebugInfo] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
@@ -45,15 +45,18 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     audioRef.current = new Audio()
 
     audioRef.current.onplay = () => {
+      console.log("🎵 Audio started playing - setting isSpeaking to true")
       setIsSpeaking(true)
       setIsProcessing(false)
     }
 
     audioRef.current.onended = () => {
+      console.log("🎵 Audio ended - setting isSpeaking to false")
       setIsSpeaking(false)
     }
 
     audioRef.current.onpause = () => {
+      console.log("🎵 Audio paused - setting isSpeaking to false")
       setIsSpeaking(false)
     }
 
@@ -90,11 +93,13 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       utterance.volume = 0.8
 
       utterance.onstart = () => {
+        console.log("🗣️ Speech synthesis started - setting isSpeaking to true")
         setIsSpeaking(true)
         setIsProcessing(false)
       }
 
       utterance.onend = () => {
+        console.log("🗣️ Speech synthesis ended - setting isSpeaking to false")
         setIsSpeaking(false)
       }
 
@@ -319,6 +324,32 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     }
   }
 
+  // Add keyboard event listeners
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only trigger if space is pressed and we're not typing in an input field
+      if (event.code === "Space" && event.target?.tagName !== "INPUT") {
+        event.preventDefault() // Prevent page scroll
+        handleMicClick()
+      }
+    }
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      // Optional: Could be used for push-to-talk functionality in the future
+      if (event.code === "Space" && event.target?.tagName !== "INPUT") {
+        event.preventDefault()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    window.addEventListener("keyup", handleKeyUp)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("keyup", handleKeyUp)
+    }
+  }, [isProcessing, isSpeaking, isRecording]) // Dependencies to ensure handleMicClick has latest state
+
   const toggleTextInput = () => {
     setShowTextInput(!showTextInput)
     if (!showTextInput) {
@@ -348,11 +379,15 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     <div className="relative w-full h-screen overflow-hidden">
       {/* 3D Background */}
       <div className="absolute inset-0">
-        {React.Children.map(children, (child) =>
-          React.isValidElement(child)
-            ? React.cloneElement(child, { isSpeaking: isSpeaking || isRecording } as any)
-            : child,
-        )}
+        {React.Children.map(children, (child) => {
+          console.log("🟡 Passing isSpeaking to child:", isSpeaking)
+          if (React.isValidElement(child)) {
+            return React.cloneElement(child as React.ReactElement<any>, {
+              isSpeaking: isSpeaking,
+            })
+          }
+          return child
+        })}
       </div>
 
       {/* Mobile UI Overlay */}
@@ -384,46 +419,17 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 z-10">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-medium text-white mb-4 drop-shadow-lg">
+            <h1 className="text-xl font-medium text-white mb-4 drop-shadow-lg tracking-wide">
               {isProcessing
-                ? "Processing..."
+                ? "Thinking..."
                 : isSpeaking
-                  ? "AI Speaking..."
+                  ? "Speaking..."
                   : isRecording
-                    ? `Recording... ${formatTime(recordingTime)}`
-                    : "AI Chat Assistant"}
+                    ? "I'm listening"
+                    : "How can I help you today?"}
             </h1>
 
-            {/* Recording Instructions */}
-            {!isRecording && !isProcessing && !isSpeaking && (
-              <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
-                <p className="text-white text-sm">🎤 Hold the microphone button to record your message</p>
-              </div>
-            )}
-
-            {/* Recording Status */}
-            {isRecording && (
-              <div className="bg-red-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                  <p className="text-white text-sm">Recording... Release to send</p>
-                </div>
-              </div>
-            )}
-
-            {/* Show last user input */}
-            {inputMessage && !isRecording && (
-              <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
-                <p className="text-white/90 text-sm">You: "{inputMessage}"</p>
-              </div>
-            )}
-
-            {/* Show AI response */}
-            {lastResponse && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 mt-4 max-w-md">
-                <p className="text-white/80 text-sm">AI: "{lastResponse}"</p>
-              </div>
-            )}
+            {/* Recording Status - Removed */}
 
             {/* Text Input Area */}
             {showTextInput && (
@@ -476,10 +482,6 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                       : "hover:bg-white/20 text-white"
               }`}
               disabled={isProcessing}
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onTouchStart={startRecording}
-              onTouchEnd={stopRecording}
               onClick={handleMicClick}
             >
               {isRecording ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
@@ -491,7 +493,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               className={`rounded-round w-12 h-12 hover:bg-white/20 text-white ${showTextInput ? "bg-white/20" : ""}`}
               onClick={toggleTextInput}
             >
-              <Settings className="w-6 h-6" />
+              <Keyboard className="w-6 h-6" />
             </Button>
           </div>
         </div>
