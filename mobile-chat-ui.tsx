@@ -388,7 +388,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               {isProcessing
                 ? "Thinking..."
                 : isSpeaking
-                  ? "AI Speaking..."
+                  ? "Speaking..."
                   : isRecording
                     ? "I'm listening"
                     : "How can I help you today?"}
