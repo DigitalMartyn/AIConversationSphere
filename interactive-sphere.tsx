@@ -5,7 +5,11 @@ import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, ContactShadows, Environment } from "@react-three/drei"
 import { CanvasTexture, AdditiveBlending } from "three"
 
-export default function Component() {
+interface ComponentProps {
+  isSpeaking?: boolean
+}
+
+export default function Component({ isSpeaking = false }: ComponentProps) {
   return (
     <div className="w-full h-screen" style={{ backgroundColor: "#c4b5fd" }}>
       <Canvas camera={{ position: [0, 0, 5], fov: 45 }} shadows>
@@ -22,7 +26,7 @@ export default function Component() {
           </mesh>
         </Environment>
 
-        <GradientSphere />
+        <GradientSphere isSpeaking={isSpeaking} />
         <FloatingParticles />
 
         <ContactShadows position={[0, -2.5, 0]} opacity={0.15} scale={3} blur={1.5} far={1.5} resolution={256} />
@@ -123,7 +127,7 @@ function FloatingParticles() {
   )
 }
 
-function GradientSphere() {
+function GradientSphere({ isSpeaking = false }: { isSpeaking?: boolean }) {
   const meshRef = useRef()
 
   // Create a simple horizontal gradient texture
@@ -152,50 +156,59 @@ function GradientSphere() {
 
   useFrame((state) => {
     if (meshRef.current) {
-      // Position sphere and add subtle floating animation
-      meshRef.current.position.y = 0 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
+      // Base floating animation
+      const baseY = Math.sin(state.clock.elapsedTime * 0.5) * 0.1
+      meshRef.current.position.y = baseY
+
+      // Much more pronounced scale pulsing when speaking
+      const baseScale = 1.125
+      if (isSpeaking) {
+        // More dramatic pulsing - oscillates between 0.9 and 1.4 scale
+        const pulseScale = baseScale + Math.sin(state.clock.elapsedTime * 4) * 0.25
+        meshRef.current.scale.setScalar(pulseScale)
+      } else {
+        meshRef.current.scale.setScalar(baseScale)
+      }
     }
 
     // Animate the texture UV coordinates for flowing gradient effect
     if (gradientTexture) {
-      // Horizontal flow - makes gradient slide across the surface
-      gradientTexture.offset.x = (state.clock.elapsedTime * 0.1) % 1
+      // Speed up texture animation when speaking
+      const speed = isSpeaking ? 0.3 : 0.1
+      gradientTexture.offset.x = (state.clock.elapsedTime * speed) % 1
 
-      // Add subtle vertical flow for more complex movement
-      gradientTexture.offset.y = Math.sin(state.clock.elapsedTime * 0.3) * 0.1
+      // Add more dramatic vertical flow when speaking
+      const verticalIntensity = isSpeaking ? 0.3 : 0.1
+      gradientTexture.offset.y = Math.sin(state.clock.elapsedTime * 0.3) * verticalIntensity
 
-      // Slight rotation for additional movement
-      gradientTexture.rotation = Math.sin(state.clock.elapsedTime * 0.2) * 0.1
+      // More rotation when speaking
+      const rotationIntensity = isSpeaking ? 0.3 : 0.1
+      gradientTexture.rotation = Math.sin(state.clock.elapsedTime * 0.2) * rotationIntensity
 
-      // Update the texture
       gradientTexture.needsUpdate = true
     }
   })
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow>
-      <sphereGeometry args={[1.125, 128, 128]} />
+      <sphereGeometry args={[1, 128, 128]} />
       <meshPhysicalMaterial
         map={gradientTexture}
         color="#ffffff"
         transparent={true}
         opacity={0.85}
-        // Subsurface scattering and transmission - adjusted for white edges
         transmission={0.4}
         thickness={0.2}
         ior={1.2}
-        // Surface properties for reflections
         roughness={0.05}
         metalness={0.0}
         clearcoat={1.0}
         clearcoatRoughness={0.05}
-        // Environment reflections
         envMapIntensity={1.0}
-        // Boost colors with emissive - enhanced for white edges
+        // Much more dramatic emissive when speaking
         emissive="#ffffff"
-        emissiveIntensity={0.2}
+        emissiveIntensity={isSpeaking ? 0.8 : 0.2}
         emissiveMap={gradientTexture}
-        // Add sheen for additional white edge effect
         sheen={1.0}
         sheenRoughness={0.1}
         sheenColor="#ffffff"
