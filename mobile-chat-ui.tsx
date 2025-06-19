@@ -397,7 +397,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
             {/* Recording Instructions */}
             {!isRecording && !isProcessing && !isSpeaking && (
               <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
-                <p className="text-white text-sm">🎤 Hold the microphone button to record your message</p>
+                <p className="text-white text-sm">🎤 Click the microphone button to start/stop recording</p>
               </div>
             )}
 
@@ -406,7 +406,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               <div className="bg-red-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                  <p className="text-white text-sm">Recording... Release to send</p>
+                  <p className="text-white text-sm">Recording... Click again to send</p>
                 </div>
               </div>
             )}
@@ -476,10 +476,6 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                       : "hover:bg-white/20 text-white"
               }`}
               disabled={isProcessing}
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onTouchStart={startRecording}
-              onTouchEnd={stopRecording}
               onClick={handleMicClick}
             >
               {isRecording ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
