@@ -49,7 +49,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     setDebugInfo((prev) => [...prev.slice(-9), debugMessage]) // Keep last 10 messages
   }
 
-  // Test microphone with real-time audio level display
+  // Test microphone with multiple detection methods
   const testMicrophone = async () => {
     if (isTestingMic) {
       // Stop testing
@@ -114,36 +114,52 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       const analyser = audioContext.createAnalyser()
       analyserRef.current = analyser
 
-      // Configure analyser for better sensitivity
-      analyser.fftSize = 2048
-      analyser.smoothingTimeConstant = 0.3
+      // Configure analyser for maximum sensitivity
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.8
       source.connect(analyser)
 
       addDebugMessage(
         `Analyser configured - fftSize: ${analyser.fftSize}, frequencyBinCount: ${analyser.frequencyBinCount}`,
       )
 
-      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+      const bufferLength = analyser.frequencyBinCount
+      const dataArray = new Uint8Array(bufferLength)
 
-      // Real-time audio level monitoring
+      // Real-time audio level monitoring with multiple methods
       const updateAudioLevel = () => {
         if (!isTestingMic || !analyserRef.current) return
 
-        analyser.getByteTimeDomainData(dataArray)
+        // Method 1: Frequency domain analysis
+        analyser.getByteFrequencyData(dataArray)
+        const frequencyLevel = Math.max(...dataArray)
 
-        // Calculate RMS (Root Mean Square) for better audio level detection
+        // Method 2: Time domain analysis
+        const timeDataArray = new Uint8Array(bufferLength)
+        analyser.getByteTimeDomainData(timeDataArray)
+
+        // Calculate RMS from time domain
         let sum = 0
-        for (let i = 0; i < dataArray.length; i++) {
-          const sample = (dataArray[i] - 128) / 128 // Convert to -1 to 1 range
+        for (let i = 0; i < timeDataArray.length; i++) {
+          const sample = (timeDataArray[i] - 128) / 128
           sum += sample * sample
         }
-        const rms = Math.sqrt(sum / dataArray.length)
-        const currentLevel = Math.floor(rms * 1000) // Increased multiplier for better visibility
+        const rms = Math.sqrt(sum / timeDataArray.length)
+        const timeLevel = Math.floor(rms * 255)
+
+        // Use the higher of the two methods
+        const currentLevel = Math.max(frequencyLevel, timeLevel)
 
         setAudioLevel(currentLevel)
 
-        if (currentLevel > 2) {
-          // Even lower threshold
+        // Log levels periodically for debugging
+        if (Math.random() < 0.1) {
+          // 10% chance to log
+          addDebugMessage(`Audio levels - Frequency: ${frequencyLevel}, Time: ${timeLevel}, Final: ${currentLevel}`)
+        }
+
+        if (currentLevel > 1) {
+          // Very low threshold
           setMicrophoneWorking(true)
           addDebugMessage(`Audio detected! Level: ${currentLevel}`)
         }
@@ -153,7 +169,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
       updateAudioLevel()
       addDebugMessage("🔊 Microphone test started - speak to see audio levels")
-      addDebugMessage("Audio monitoring loop started")
+      addDebugMessage("Audio monitoring loop started with dual detection methods")
     } catch (error) {
       addDebugMessage(`❌ Microphone test failed: ${error.message}`)
       addDebugMessage(`Error name: ${error.name}`)
@@ -161,6 +177,15 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
       setIsTestingMic(false)
       alert(`Microphone access failed: ${error.message}`)
     }
+  }
+
+  // Force enable speech recognition (skip microphone test)
+  const forceEnableSpeechRecognition = () => {
+    addDebugMessage("Force enabling speech recognition...")
+    setSpeechRecognitionSupported(true)
+    setMicrophoneWorking(true)
+    setShowTextInput(false)
+    addDebugMessage("Speech recognition force enabled - microphone issues bypassed")
   }
 
   // Initialize audio element and speech recognition
@@ -201,8 +226,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
     if (typeof window !== "undefined") {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
       if (SpeechRecognition) {
-        addDebugMessage("SpeechRecognition API found (disabled until microphone works)")
-        // Don't set supported yet - wait for microphone test
+        addDebugMessage("SpeechRecognition API found")
       } else {
         addDebugMessage("Speech recognition not supported in this browser")
       }
@@ -333,13 +357,13 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
   const startListening = async () => {
     if (!speechRecognitionSupported) {
-      alert("Please enable speech recognition first by testing your microphone.")
+      alert("Please enable speech recognition first.")
       return
     }
 
     addDebugMessage("=== Starting speech recognition ===")
 
-    if (recognitionRef.current && !isListening && !isSpeaking && !isProcessing) {
+    if (!isListening && !isSpeaking && !isProcessing) {
       try {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
         const recognition = new SpeechRecognition()
@@ -358,6 +382,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
           let transcript = ""
           for (let i = 0; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript
+            addDebugMessage(`Result ${i}: "${event.results[i][0].transcript}"`)
           }
           setCurrentTranscript(transcript)
           if (transcript.trim()) {
@@ -376,8 +401,8 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
 
         recognition.onerror = (event) => {
           addDebugMessage(`Speech recognition error: ${event.error}`)
+          addDebugMessage(`Error details: ${JSON.stringify(event)}`)
           setIsListening(false)
-          alert(`Speech recognition error: ${event.error}. Please try again or use text input.`)
         }
 
         recognitionRef.current = recognition
@@ -500,13 +525,18 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
             {/* Microphone Test Section */}
             {!microphoneWorking && (
               <div className="bg-yellow-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
-                <p className="text-white text-sm mb-3">🎤 Test your microphone first:</p>
-                <Button
-                  onClick={testMicrophone}
-                  className={`w-full ${isTestingMic ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600"}`}
-                >
-                  {isTestingMic ? "Stop Test" : "Test Microphone"}
-                </Button>
+                <p className="text-white text-sm mb-3">🎤 Test your microphone:</p>
+                <div className="space-y-2">
+                  <Button
+                    onClick={testMicrophone}
+                    className={`w-full ${isTestingMic ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600"}`}
+                  >
+                    {isTestingMic ? "Stop Test" : "Test Microphone"}
+                  </Button>
+                  <Button onClick={forceEnableSpeechRecognition} className="w-full bg-orange-500 hover:bg-orange-600">
+                    Skip Test & Try Speech Recognition
+                  </Button>
+                </div>
                 {isTestingMic && (
                   <div className="mt-3">
                     <div className="flex items-center gap-2">
@@ -519,7 +549,7 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                       </div>
                       <span className="text-xs text-white">{audioLevel}/255</span>
                     </div>
-                    <p className="text-xs text-white/80 mt-1">Speak to see audio levels</p>
+                    <p className="text-xs text-white/80 mt-1">Speak loudly to see audio levels</p>
                   </div>
                 )}
               </div>
@@ -532,6 +562,13 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
                 <Button onClick={enableSpeechRecognition} className="w-full bg-green-500 hover:bg-green-600">
                   Enable Speech Recognition
                 </Button>
+              </div>
+            )}
+
+            {/* Speech Recognition Ready */}
+            {speechRecognitionSupported && (
+              <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-4 py-3 mt-4 max-w-md">
+                <p className="text-white text-sm">🎤 Speech recognition ready! Click the microphone button to speak.</p>
               </div>
             )}
 
