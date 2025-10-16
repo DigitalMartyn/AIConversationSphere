@@ -4,7 +4,8 @@ import type React from "react"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Mic, X, Settings } from "lucide-react"
+import { Mic, X, Settings, Calendar } from "lucide-react"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 
 interface MobileChatUIProps {
   children: React.ReactNode
@@ -12,6 +13,33 @@ interface MobileChatUIProps {
 
 export default function MobileChatUI({ children }: MobileChatUIProps) {
   const [isListening, setIsListening] = useState(false)
+  const [isCalendarConnected, setIsCalendarConnected] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+
+  const handleConnectCalendar = async () => {
+    try {
+      const response = await fetch("/api/calendar/auth")
+      const data = await response.json()
+      if (data.authUrl) {
+        window.location.href = data.authUrl
+      }
+    } catch (error) {
+      console.error("Failed to connect calendar:", error)
+    }
+  }
+
+  useState(() => {
+    const checkCalendarStatus = async () => {
+      try {
+        const response = await fetch("/api/calendar/status")
+        const data = await response.json()
+        setIsCalendarConnected(data.connected)
+      } catch (error) {
+        console.error("Failed to check calendar status:", error)
+      }
+    }
+    checkCalendarStatus()
+  })
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
@@ -52,9 +80,40 @@ export default function MobileChatUI({ children }: MobileChatUIProps) {
               <Mic className="w-7 h-7" />
             </Button>
 
-            <Button variant="ghost" size="icon" className="rounded-full w-12 h-12 hover:bg-white/20 text-white">
-              <Settings className="w-6 h-6" />
-            </Button>
+            <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full w-12 h-12 hover:bg-white/20 text-white">
+                  <Settings className="w-6 h-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                <SheetHeader>
+                  <SheetTitle>Settings</SheetTitle>
+                  <SheetDescription>Manage your integrations and preferences</SheetDescription>
+                </SheetHeader>
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="w-5 h-5" />
+                      <div>
+                        <h3 className="font-medium">Google Calendar</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {isCalendarConnected ? "Connected" : "Not connected"}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant={isCalendarConnected ? "outline" : "default"}
+                      size="sm"
+                      onClick={handleConnectCalendar}
+                      disabled={isCalendarConnected}
+                    >
+                      {isCalendarConnected ? "Connected" : "Connect"}
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>
