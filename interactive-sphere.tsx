@@ -1,24 +1,11 @@
 "use client"
 
-import { useRef, useMemo, useEffect } from "react"
+import { useRef, useMemo } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, ContactShadows, Environment } from "@react-three/drei"
 import { CanvasTexture, AdditiveBlending } from "three"
 
-interface ComponentProps {
-  isSpeaking?: boolean
-}
-
-// Create a global state that can be accessed by the sphere
-let globalSpeakingState = false
-
-export default function Component({ isSpeaking = false }: ComponentProps) {
-  // Update global state whenever prop changes
-  useEffect(() => {
-    console.log("🟢 InteractiveSphere isSpeaking changed to:", isSpeaking)
-    globalSpeakingState = isSpeaking
-  }, [isSpeaking])
-
+export default function Component() {
   return (
     <div className="w-full h-screen" style={{ backgroundColor: "#c4b5fd" }}>
       <Canvas camera={{ position: [0, 0, 5], fov: 45 }} shadows>
@@ -164,82 +151,51 @@ function GradientSphere() {
   }, [])
 
   useFrame((state) => {
-    // Access the global speaking state directly
-    const isSpeaking = globalSpeakingState
-
     if (meshRef.current) {
-      // Base floating animation
-      const baseY = Math.sin(state.clock.elapsedTime * 0.5) * 0.1
-      meshRef.current.position.y = baseY
-
-      // Base scale and animation parameters
-      const baseScale = 1.5
-
-      if (isSpeaking) {
-        // Dramatic pulsing when AI is speaking
-        const pulseAmount = Math.sin(state.clock.elapsedTime * 5) * 0.1
-        const pulseScale = baseScale + pulseAmount
-
-        // Log every few seconds to confirm pulsing
-        if (Math.floor(state.clock.elapsedTime) % 2 === 0 && state.clock.elapsedTime % 1 < 0.1) {
-          console.log("🔵 Sphere is pulsing! Scale:", pulseScale.toFixed(2))
-        }
-
-        meshRef.current.scale.setScalar(pulseScale)
-
-        // Add rotation when speaking
-        meshRef.current.rotation.y = state.clock.elapsedTime * 0.8
-        meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.2
-      } else {
-        // Subtle breathing animation when not speaking
-        const breatheAmount = Math.sin(state.clock.elapsedTime * 0.8) * 0.03
-        const breatheScale = baseScale + breatheAmount
-        meshRef.current.scale.setScalar(breatheScale)
-
-        // Slow rotation when not speaking
-        meshRef.current.rotation.y = state.clock.elapsedTime * 0.1
-        meshRef.current.rotation.x = 0
-      }
+      // Position sphere and add subtle floating animation
+      meshRef.current.position.y = 0 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1
     }
 
     // Animate the texture UV coordinates for flowing gradient effect
     if (gradientTexture) {
-      // Speed up texture animation when speaking
-      const speed = isSpeaking ? 0.4 : 0.1
-      gradientTexture.offset.x = (state.clock.elapsedTime * speed) % 1
+      // Horizontal flow - makes gradient slide across the surface
+      gradientTexture.offset.x = (state.clock.elapsedTime * 0.1) % 1
 
-      // Add more dramatic vertical flow when speaking
-      const verticalIntensity = isSpeaking ? 0.2 : 0.05
-      gradientTexture.offset.y = Math.sin(state.clock.elapsedTime * 0.3) * verticalIntensity
+      // Add subtle vertical flow for more complex movement
+      gradientTexture.offset.y = Math.sin(state.clock.elapsedTime * 0.3) * 0.1
 
-      // More rotation when speaking
-      const rotationIntensity = isSpeaking ? 0.2 : 0.05
-      gradientTexture.rotation = Math.sin(state.clock.elapsedTime * 0.2) * rotationIntensity
+      // Slight rotation for additional movement
+      gradientTexture.rotation = Math.sin(state.clock.elapsedTime * 0.2) * 0.1
 
+      // Update the texture
       gradientTexture.needsUpdate = true
     }
   })
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow>
-      <sphereGeometry args={[1, 128, 128]} />
+      <sphereGeometry args={[1.125, 128, 128]} />
       <meshPhysicalMaterial
         map={gradientTexture}
         color="#ffffff"
         transparent={true}
         opacity={0.85}
+        // Subsurface scattering and transmission - adjusted for white edges
         transmission={0.4}
         thickness={0.2}
         ior={1.2}
+        // Surface properties for reflections
         roughness={0.05}
         metalness={0.0}
         clearcoat={1.0}
         clearcoatRoughness={0.05}
+        // Environment reflections
         envMapIntensity={1.0}
-        // More dramatic emissive when speaking
+        // Boost colors with emissive - enhanced for white edges
         emissive="#ffffff"
-        emissiveIntensity={globalSpeakingState ? 0.8 : 0.2}
+        emissiveIntensity={0.2}
         emissiveMap={gradientTexture}
+        // Add sheen for additional white edge effect
         sheen={1.0}
         sheenRoughness={0.1}
         sheenColor="#ffffff"
