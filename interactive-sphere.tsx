@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useMemo, useEffect } from "react"
-import { Canvas, useFrame, extend } from "@react-three/fiber"
+import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, ContactShadows } from "@react-three/drei"
 import { 
   CanvasTexture, 
@@ -12,7 +12,7 @@ import {
   Color,
   BufferAttribute
 } from "three"
-import type { Mesh, MeshStandardMaterial } from "three"
+import type { Mesh } from "three"
 
 interface ComponentProps {
   isSpeaking?: boolean
@@ -28,11 +28,11 @@ export default function Component({ isSpeaking = false }: ComponentProps) {
 
   return (
     <div className="w-full h-screen" style={{ backgroundColor: "#1a1a2e" }}>
-      <Canvas camera={{ position: [0, 0, 5], fov: 45 }} shadows>
-        <ambientLight intensity={0.6} color="#ffffff" />
-        <directionalLight position={[5, 5, 5]} intensity={0.8} color="#ffffff" />
-        <pointLight position={[-3, 2, 3]} intensity={0.4} color="#ff69b4" />
-        <pointLight position={[3, 2, -3]} intensity={0.4} color="#00ffff" />
+      <Canvas camera={{ position: [0, 0, 4], fov: 45 }} shadows>
+        <ambientLight intensity={0.8} color="#ffffff" />
+        <directionalLight position={[5, 5, 5]} intensity={0.6} color="#ffffff" />
+        <pointLight position={[-3, 2, 3]} intensity={0.3} color="#ff69b4" />
+        <pointLight position={[3, 2, -3]} intensity={0.3} color="#00ffff" />
 
         <GradientSpline />
         <FloatingParticles />
@@ -51,19 +51,19 @@ export default function Component({ isSpeaking = false }: ComponentProps) {
 }
 
 function FloatingParticles() {
-  const particleCount = 150
+  const particleCount = 100
 
   const particleData = useMemo(() => {
     const positions = new Float32Array(particleCount * 3)
     const colors = new Float32Array(particleCount * 3)
 
     const gradientColors = [
-      [1.0, 0.75, 0.6],  // Peach
-      [1.0, 1.0, 0.5],   // Yellow
-      [0.4, 0.5, 1.0],   // Blue
-      [0.4, 0.9, 0.9],   // Cyan
-      [0.5, 0.9, 0.6],   // Green
-      [0.85, 0.6, 0.9],  // Pink/Lavender
+      [1.0, 0.6, 0.7],   // Pink
+      [1.0, 0.8, 0.5],   // Peach
+      [1.0, 1.0, 0.4],   // Yellow
+      [0.3, 0.4, 0.95],  // Blue
+      [0.3, 0.9, 0.9],   // Cyan
+      [0.5, 0.95, 0.55], // Green
     ]
 
     for (let i = 0; i < particleCount; i++) {
@@ -118,7 +118,7 @@ function FloatingParticles() {
         vertexColors={true}
         blending={AdditiveBlending}
         transparent={true}
-        opacity={0.6}
+        opacity={0.5}
         sizeAttenuation={true}
         map={circleTexture}
       />
@@ -126,97 +126,67 @@ function FloatingParticles() {
   )
 }
 
-// Create an open flowing curve that matches the reference figure-8 shape
-function createSplineCurve(): CatmullRomCurve3 {
-  // Reference shape: 
-  // - Pink/lavender tail at top right going up-right
-  // - Curves down and left into peach/orange section
-  // - Makes a loop on the left side
-  // - Crosses through itself going down-right (yellow section)
-  // - Blue section going down
-  // - Cyan/green section makes a loop on bottom right
-  // - Ends with blue tail going down
+// Create a smooth infinity loop using mathematical lemniscate
+function createInfinityCurve(): CatmullRomCurve3 {
+  const points: Vector3[] = []
+  const segments = 100
+  const scale = 1.2
   
-  const controlPoints = [
-    // Pink/lavender end - top right, pointing up-right
-    new Vector3(0.9, 1.1, 0.15),
-    new Vector3(0.6, 0.8, 0.1),
+  // Lemniscate of Bernoulli parametric equations
+  // With slight 3D depth for visual interest
+  for (let i = 0; i <= segments; i++) {
+    const t = (i / segments) * Math.PI * 2
     
-    // Curve into peach/orange - going left
-    new Vector3(0.2, 0.5, 0.05),
-    new Vector3(-0.3, 0.4, 0),
+    // Lemniscate formula
+    const denom = 1 + Math.sin(t) * Math.sin(t)
+    const x = scale * Math.cos(t) / denom
+    const y = scale * Math.sin(t) * Math.cos(t) / denom
+    // Add subtle z-depth for 3D effect
+    const z = 0.15 * Math.sin(t * 2)
     
-    // Left loop (peach/orange area) - goes down-left, loops back
-    new Vector3(-0.8, 0.2, -0.1),
-    new Vector3(-1.0, -0.15, -0.15),
-    new Vector3(-0.85, -0.45, -0.1),
-    new Vector3(-0.5, -0.5, 0),
-    
-    // Cross back through center going down-right (yellow to blue transition)
-    new Vector3(-0.1, -0.35, 0.15),
-    new Vector3(0.25, -0.25, 0.2),
-    
-    // Blue section going down and right toward bottom loop
-    new Vector3(0.5, -0.4, 0.15),
-    new Vector3(0.7, -0.6, 0.1),
-    
-    // Bottom right loop (cyan/green area)
-    new Vector3(0.9, -0.75, 0),
-    new Vector3(1.0, -0.5, -0.15),
-    new Vector3(0.85, -0.25, -0.1),
-    new Vector3(0.55, -0.2, 0),
-    
-    // Loop continues back and down (more cyan/green)
-    new Vector3(0.3, -0.35, 0.1),
-    new Vector3(0.2, -0.6, 0.15),
-    
-    // Blue tail going down
-    new Vector3(0.1, -0.9, 0.1),
-    new Vector3(-0.05, -1.2, 0.05),
-  ]
+    points.push(new Vector3(x, y, z))
+  }
   
-  const curve = new CatmullRomCurve3(controlPoints, false)
-  return curve
+  // Create open curve by removing last few points to create tails
+  const openPoints = points.slice(10, points.length - 10)
+  
+  return new CatmullRomCurve3(openPoints, false, 'catmullrom', 0.5)
 }
 
-// Gradient colors matching the reference exactly
-// Flow: Pink/lavender -> Peach -> Yellow -> Blue -> Cyan -> Green -> Blue
+// Vibrant gradient colors matching the reference
 const gradientColors = [
-  new Color("#E8B4D8"), // Pink/Lavender (start - top right)
-  new Color("#F5C09A"), // Peach
-  new Color("#F7D86C"), // Yellow
-  new Color("#5B6FE1"), // Blue
-  new Color("#5BD4D4"), // Cyan
-  new Color("#7EE08A"), // Green
-  new Color("#5B6FE1"), // Blue (end - bottom)
+  new Color("#FFB6C1"), // Light pink (start)
+  new Color("#FFB088"), // Peach/coral
+  new Color("#FFE55C"), // Bright yellow
+  new Color("#4169E1"), // Royal blue
+  new Color("#40E0D0"), // Turquoise/cyan
+  new Color("#7CFC00"), // Bright lime green
+  new Color("#4169E1"), // Royal blue (end)
 ]
 
 function GradientSpline() {
   const meshRef = useRef<Mesh>(null)
   const colorOffsetRef = useRef(0)
   
-  // Create the spline curve
-  const curve = useMemo(() => createSplineCurve(), [])
+  // Create the infinity curve
+  const curve = useMemo(() => createInfinityCurve(), [])
   
   // Create tube geometry with vertex colors
   const geometry = useMemo(() => {
-    const tubeGeometry = new TubeGeometry(curve, 200, 0.18, 32, false)
+    const tubularSegments = 150
+    const radius = 0.12
+    const radialSegments = 24
     
-    // Get the position attribute to determine how many vertices we have
+    const tubeGeometry = new TubeGeometry(curve, tubularSegments, radius, radialSegments, false)
+    
     const positions = tubeGeometry.attributes.position
     const vertexCount = positions.count
-    
-    // Create color attribute
     const colors = new Float32Array(vertexCount * 3)
-    
-    // Get the tube parameters to calculate position along curve
-    const tubularSegments = 200
-    const radialSegments = 32
     
     for (let i = 0; i <= tubularSegments; i++) {
       const t = i / tubularSegments
       
-      // Interpolate through the gradient colors
+      // Smooth interpolation through gradient colors
       const colorT = t * (gradientColors.length - 1)
       const colorIndex = Math.floor(colorT)
       const colorFraction = colorT - colorIndex
@@ -224,7 +194,7 @@ function GradientSpline() {
       const color1 = gradientColors[Math.min(colorIndex, gradientColors.length - 1)]
       const color2 = gradientColors[Math.min(colorIndex + 1, gradientColors.length - 1)]
       
-      // Lerp between colors
+      // Smooth lerp between colors
       const r = color1.r + (color2.r - color1.r) * colorFraction
       const g = color1.g + (color2.g - color1.g) * colorFraction
       const b = color1.b + (color2.b - color1.b) * colorFraction
@@ -249,7 +219,7 @@ function GradientSpline() {
     const isSpeaking = globalSpeakingState
     
     // Animate color flow along the tube
-    const speed = isSpeaking ? 0.4 : 0.15
+    const speed = isSpeaking ? 0.5 : 0.2
     colorOffsetRef.current = (colorOffsetRef.current + speed * 0.016) % 1
     
     if (meshRef.current && meshRef.current.geometry) {
@@ -257,13 +227,12 @@ function GradientSpline() {
       const colorAttr = geo.attributes.color
       
       if (colorAttr) {
-        const tubularSegments = 200
-        const radialSegments = 32
+        const tubularSegments = 150
+        const radialSegments = 24
         const vertexCount = colorAttr.count
         const offset = colorOffsetRef.current
         
         for (let i = 0; i <= tubularSegments; i++) {
-          // Offset the t value for animation
           const t = ((i / tubularSegments) + offset) % 1
           
           const colorT = t * (gradientColors.length - 1)
@@ -289,9 +258,9 @@ function GradientSpline() {
       }
     }
     
-    // Gentle floating motion only
+    // Very gentle floating motion only
     if (meshRef.current) {
-      meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.5) * 0.03
+      meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.4) * 0.02
     }
   })
 
@@ -299,10 +268,10 @@ function GradientSpline() {
     <mesh ref={meshRef} geometry={geometry}>
       <meshStandardMaterial
         vertexColors={true}
-        roughness={0.3}
-        metalness={0.1}
+        roughness={0.2}
+        metalness={0.05}
         emissive="#ffffff"
-        emissiveIntensity={0.1}
+        emissiveIntensity={0.15}
       />
     </mesh>
   )
