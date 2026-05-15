@@ -126,56 +126,69 @@ function FloatingParticles() {
   )
 }
 
-// Create an open flowing curve that loops like the reference image
+// Create an open flowing curve that matches the reference figure-8 shape
 function createSplineCurve(): CatmullRomCurve3 {
-  const points: Vector3[] = []
+  // Reference shape: 
+  // - Pink/lavender tail at top right going up-right
+  // - Curves down and left into peach/orange section
+  // - Makes a loop on the left side
+  // - Crosses through itself going down-right (yellow section)
+  // - Blue section going down
+  // - Cyan/green section makes a loop on bottom right
+  // - Ends with blue tail going down
   
-  // Hand-crafted control points to create the looping shape from the reference
-  // This creates an open curve (not closed) that weaves through itself
   const controlPoints = [
-    // Start at bottom left, going up
-    new Vector3(-0.8, -1.2, 0),
-    new Vector3(-0.6, -0.6, 0.1),
-    new Vector3(-0.3, 0, 0.2),
-    // Loop around to the left (peach/orange loop)
-    new Vector3(-0.8, 0.3, 0.1),
-    new Vector3(-1.1, 0.1, -0.1),
-    new Vector3(-1.0, -0.3, -0.2),
-    new Vector3(-0.6, -0.4, -0.1),
-    // Cross over and go up right
-    new Vector3(-0.2, -0.2, 0.1),
-    new Vector3(0.2, 0.2, 0.2),
-    // Upper pink section going right and down
-    new Vector3(0.4, 0.6, 0.1),
-    new Vector3(0.7, 0.8, -0.1),
-    new Vector3(0.9, 0.5, -0.2),
-    // Curve down into the bottom right loop (cyan/green)
-    new Vector3(0.8, 0.1, -0.1),
-    new Vector3(0.5, -0.3, 0.1),
-    new Vector3(0.2, -0.5, 0.2),
-    // Bottom loop
-    new Vector3(0.4, -0.8, 0.1),
-    new Vector3(0.8, -0.7, -0.1),
-    new Vector3(1.0, -0.4, -0.2),
-    new Vector3(0.9, -0.1, -0.1),
-    // Exit going up and to the right
-    new Vector3(0.7, 0.2, 0.1),
-    new Vector3(0.5, 0.5, 0.2),
-    new Vector3(0.3, 0.9, 0.1),
+    // Pink/lavender end - top right, pointing up-right
+    new Vector3(0.9, 1.1, 0.15),
+    new Vector3(0.6, 0.8, 0.1),
+    
+    // Curve into peach/orange - going left
+    new Vector3(0.2, 0.5, 0.05),
+    new Vector3(-0.3, 0.4, 0),
+    
+    // Left loop (peach/orange area) - goes down-left, loops back
+    new Vector3(-0.8, 0.2, -0.1),
+    new Vector3(-1.0, -0.15, -0.15),
+    new Vector3(-0.85, -0.45, -0.1),
+    new Vector3(-0.5, -0.5, 0),
+    
+    // Cross back through center going down-right (yellow to blue transition)
+    new Vector3(-0.1, -0.35, 0.15),
+    new Vector3(0.25, -0.25, 0.2),
+    
+    // Blue section going down and right toward bottom loop
+    new Vector3(0.5, -0.4, 0.15),
+    new Vector3(0.7, -0.6, 0.1),
+    
+    // Bottom right loop (cyan/green area)
+    new Vector3(0.9, -0.75, 0),
+    new Vector3(1.0, -0.5, -0.15),
+    new Vector3(0.85, -0.25, -0.1),
+    new Vector3(0.55, -0.2, 0),
+    
+    // Loop continues back and down (more cyan/green)
+    new Vector3(0.3, -0.35, 0.1),
+    new Vector3(0.2, -0.6, 0.15),
+    
+    // Blue tail going down
+    new Vector3(0.1, -0.9, 0.1),
+    new Vector3(-0.05, -1.2, 0.05),
   ]
   
-  const curve = new CatmullRomCurve3(controlPoints, false) // false = open curve
+  const curve = new CatmullRomCurve3(controlPoints, false)
   return curve
 }
 
-// Gradient colors matching the reference: peach -> yellow -> blue -> cyan -> green -> pink/lavender
+// Gradient colors matching the reference exactly
+// Flow: Pink/lavender -> Peach -> Yellow -> Blue -> Cyan -> Green -> Blue
 const gradientColors = [
-  new Color("#F5C09A"), // Peach/Orange
+  new Color("#E8B4D8"), // Pink/Lavender (start - top right)
+  new Color("#F5C09A"), // Peach
   new Color("#F7D86C"), // Yellow
-  new Color("#5B7FE1"), // Blue
+  new Color("#5B6FE1"), // Blue
   new Color("#5BD4D4"), // Cyan
   new Color("#7EE08A"), // Green
-  new Color("#D4A5E8"), // Pink/Lavender
+  new Color("#5B6FE1"), // Blue (end - bottom)
 ]
 
 function GradientSpline() {
@@ -187,7 +200,7 @@ function GradientSpline() {
   
   // Create tube geometry with vertex colors
   const geometry = useMemo(() => {
-    const tubeGeometry = new TubeGeometry(curve, 200, 0.12, 24, false)
+    const tubeGeometry = new TubeGeometry(curve, 200, 0.18, 32, false)
     
     // Get the position attribute to determine how many vertices we have
     const positions = tubeGeometry.attributes.position
@@ -198,7 +211,7 @@ function GradientSpline() {
     
     // Get the tube parameters to calculate position along curve
     const tubularSegments = 200
-    const radialSegments = 24
+    const radialSegments = 32
     
     for (let i = 0; i <= tubularSegments; i++) {
       const t = i / tubularSegments
@@ -245,7 +258,7 @@ function GradientSpline() {
       
       if (colorAttr) {
         const tubularSegments = 200
-        const radialSegments = 24
+        const radialSegments = 32
         const vertexCount = colorAttr.count
         const offset = colorOffsetRef.current
         
