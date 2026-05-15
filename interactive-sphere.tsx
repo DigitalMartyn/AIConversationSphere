@@ -48,8 +48,7 @@ export default function Component({ isSpeaking = false }: ComponentProps) {
           enableRotate={true}
           minDistance={4}
           maxDistance={10}
-          autoRotate={true}
-          autoRotateSpeed={0.5}
+          autoRotate={false}
         />
       </Canvas>
     </div>
@@ -150,7 +149,7 @@ function createSplineCurve(): CatmullRomCurve3 {
     
     // Create a complex looping pattern similar to the reference image
     // This creates overlapping loops that intertwine
-    const scale = 1.5
+    const scale = 0.6
     
     // Trefoil-like knot pattern
     const x = scale * (Math.sin(t) + 2 * Math.sin(2 * t))
@@ -195,7 +194,7 @@ function GradientSpline() {
     const texture = new CanvasTexture(canvas)
     texture.wrapS = RepeatWrapping
     texture.wrapT = RepeatWrapping
-    texture.repeat.set(3, 1) // Repeat the gradient along the tube
+    texture.repeat.set(1, 1) // Single smooth gradient along the tube
     return texture
   }, [])
 
@@ -203,19 +202,9 @@ function GradientSpline() {
     const isSpeaking = globalSpeakingState
 
     if (meshRef.current) {
-      // Gentle floating animation
-      const baseY = Math.sin(state.clock.elapsedTime * 0.3) * 0.1
+      // Gentle floating animation only - no rotation
+      const baseY = Math.sin(state.clock.elapsedTime * 0.3) * 0.05
       meshRef.current.position.y = baseY
-
-      // Rotation animation
-      if (isSpeaking) {
-        // Faster rotation when speaking
-        meshRef.current.rotation.y = state.clock.elapsedTime * 0.3
-        meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.2) * 0.1
-      } else {
-        // Slow idle rotation
-        meshRef.current.rotation.y = state.clock.elapsedTime * 0.1
-      }
     }
 
     // Animate the texture flowing along the spline
@@ -229,7 +218,7 @@ function GradientSpline() {
 
   return (
     <group ref={meshRef}>
-      <Tube args={[curve, 300, 0.12, 32, true]}>
+      <Tube args={[curve, 300, 0.25, 32, true]}>
         <meshPhysicalMaterial
           map={gradientTexture}
           color="#ffffff"
